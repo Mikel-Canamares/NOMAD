@@ -1,16 +1,16 @@
 -- Merging decision tree log ---
 meta-data#com.google.android.geo.API_KEY
-INJECTED from D:\PROYECTOS\NOMAD\PROTOTIPO\NOMAD\app-android\app\src\main\AndroidManifest.xml:21:9-23:47
+INJECTED from D:\PROYECTOS\NOMAD\PROTOTIPO\NOMAD\app-android\app\src\main\AndroidManifest.xml:22:9-24:47
 	android:value
 		INJECTED from D:\PROYECTOS\NOMAD\PROTOTIPO\NOMAD\app-android\app\src\main\AndroidManifest.xml
-		ADDED from D:\PROYECTOS\NOMAD\PROTOTIPO\NOMAD\app-android\app\src\main\AndroidManifest.xml:23:13-44
+		ADDED from D:\PROYECTOS\NOMAD\PROTOTIPO\NOMAD\app-android\app\src\main\AndroidManifest.xml:24:13-44
 	android:name
-		ADDED from D:\PROYECTOS\NOMAD\PROTOTIPO\NOMAD\app-android\app\src\main\AndroidManifest.xml:22:13-58
+		ADDED from D:\PROYECTOS\NOMAD\PROTOTIPO\NOMAD\app-android\app\src\main\AndroidManifest.xml:23:13-58
 manifest
-ADDED from D:\PROYECTOS\NOMAD\PROTOTIPO\NOMAD\app-android\app\src\main\AndroidManifest.xml:2:1-36:12
-INJECTED from D:\PROYECTOS\NOMAD\PROTOTIPO\NOMAD\app-android\app\src\main\AndroidManifest.xml:2:1-36:12
-INJECTED from D:\PROYECTOS\NOMAD\PROTOTIPO\NOMAD\app-android\app\src\main\AndroidManifest.xml:2:1-36:12
-INJECTED from D:\PROYECTOS\NOMAD\PROTOTIPO\NOMAD\app-android\app\src\main\AndroidManifest.xml:2:1-36:12
+ADDED from D:\PROYECTOS\NOMAD\PROTOTIPO\NOMAD\app-android\app\src\main\AndroidManifest.xml:2:1-37:12
+INJECTED from D:\PROYECTOS\NOMAD\PROTOTIPO\NOMAD\app-android\app\src\main\AndroidManifest.xml:2:1-37:12
+INJECTED from D:\PROYECTOS\NOMAD\PROTOTIPO\NOMAD\app-android\app\src\main\AndroidManifest.xml:2:1-37:12
+INJECTED from D:\PROYECTOS\NOMAD\PROTOTIPO\NOMAD\app-android\app\src\main\AndroidManifest.xml:2:1-37:12
 MERGED from [androidx.navigation:navigation-common:2.8.4] C:\Users\Mikel\.gradle\caches\8.9\transforms\80fbb12318df274034d7baa12d0313d0\transformed\navigation-common-2.8.4\AndroidManifest.xml:17:1-22:12
 MERGED from [androidx.navigation:navigation-runtime:2.8.4] C:\Users\Mikel\.gradle\caches\8.9\transforms\055ac4e7d6749f90423c958a9b0d7bbc\transformed\navigation-runtime-2.8.4\AndroidManifest.xml:17:1-22:12
 MERGED from [androidx.navigation:navigation-common-ktx:2.8.4] C:\Users\Mikel\.gradle\caches\8.9\transforms\63e96c9ab7fd9065adccc89850129573\transformed\navigation-common-ktx-2.8.4\AndroidManifest.xml:2:1-7:12
@@ -107,8 +107,8 @@ MERGED from [com.google.android.gms:play-services-maps:19.0.0] C:\Users\Mikel\.g
 	android:name
 		ADDED from D:\PROYECTOS\NOMAD\PROTOTIPO\NOMAD\app-android\app\src\main\AndroidManifest.xml:10:22-76
 application
-ADDED from D:\PROYECTOS\NOMAD\PROTOTIPO\NOMAD\app-android\app\src\main\AndroidManifest.xml:12:5-34:19
-INJECTED from D:\PROYECTOS\NOMAD\PROTOTIPO\NOMAD\app-android\app\src\main\AndroidManifest.xml:12:5-34:19
+ADDED from D:\PROYECTOS\NOMAD\PROTOTIPO\NOMAD\app-android\app\src\main\AndroidManifest.xml:12:5-35:19
+INJECTED from D:\PROYECTOS\NOMAD\PROTOTIPO\NOMAD\app-android\app\src\main\AndroidManifest.xml:12:5-35:19
 MERGED from [androidx.compose.ui:ui-tooling-android:1.7.5] C:\Users\Mikel\.gradle\caches\8.9\transforms\aa19dde9f16a217f2cd21c0465a8a518\transformed\ui-tooling-release\AndroidManifest.xml:22:5-26:19
 MERGED from [androidx.compose.ui:ui-tooling-android:1.7.5] C:\Users\Mikel\.gradle\caches\8.9\transforms\aa19dde9f16a217f2cd21c0465a8a518\transformed\ui-tooling-release\AndroidManifest.xml:22:5-26:19
 MERGED from [androidx.compose.ui:ui-test-manifest:1.7.5] C:\Users\Mikel\.gradle\caches\8.9\transforms\4d3b114983d7a3312260d993a62f0453\transformed\ui-test-manifest-1.7.5\AndroidManifest.xml:22:5-26:19
@@ -151,24 +151,26 @@ MERGED from [androidx.versionedparcelable:versionedparcelable:1.1.1] C:\Users\Mi
 		ADDED from D:\PROYECTOS\NOMAD\PROTOTIPO\NOMAD\app-android\app\src\main\AndroidManifest.xml:13:9-35
 	android:theme
 		ADDED from D:\PROYECTOS\NOMAD\PROTOTIPO\NOMAD\app-android\app\src\main\AndroidManifest.xml:18:9-43
+	android:networkSecurityConfig
+		ADDED from D:\PROYECTOS\NOMAD\PROTOTIPO\NOMAD\app-android\app\src\main\AndroidManifest.xml:19:9-69
 activity#com.nomad.app.MainActivity
-ADDED from D:\PROYECTOS\NOMAD\PROTOTIPO\NOMAD\app-android\app\src\main\AndroidManifest.xml:25:9-33:20
+ADDED from D:\PROYECTOS\NOMAD\PROTOTIPO\NOMAD\app-android\app\src\main\AndroidManifest.xml:26:9-34:20
 	android:exported
-		ADDED from D:\PROYECTOS\NOMAD\PROTOTIPO\NOMAD\app-android\app\src\main\AndroidManifest.xml:27:13-36
+		ADDED from D:\PROYECTOS\NOMAD\PROTOTIPO\NOMAD\app-android\app\src\main\AndroidManifest.xml:28:13-36
 	android:theme
-		ADDED from D:\PROYECTOS\NOMAD\PROTOTIPO\NOMAD\app-android\app\src\main\AndroidManifest.xml:28:13-47
+		ADDED from D:\PROYECTOS\NOMAD\PROTOTIPO\NOMAD\app-android\app\src\main\AndroidManifest.xml:29:13-47
 	android:name
-		ADDED from D:\PROYECTOS\NOMAD\PROTOTIPO\NOMAD\app-android\app\src\main\AndroidManifest.xml:26:13-41
+		ADDED from D:\PROYECTOS\NOMAD\PROTOTIPO\NOMAD\app-android\app\src\main\AndroidManifest.xml:27:13-41
 intent-filter#action:name:android.intent.action.MAIN+category:name:android.intent.category.LAUNCHER
-ADDED from D:\PROYECTOS\NOMAD\PROTOTIPO\NOMAD\app-android\app\src\main\AndroidManifest.xml:29:13-32:29
+ADDED from D:\PROYECTOS\NOMAD\PROTOTIPO\NOMAD\app-android\app\src\main\AndroidManifest.xml:30:13-33:29
 action#android.intent.action.MAIN
-ADDED from D:\PROYECTOS\NOMAD\PROTOTIPO\NOMAD\app-android\app\src\main\AndroidManifest.xml:30:17-69
+ADDED from D:\PROYECTOS\NOMAD\PROTOTIPO\NOMAD\app-android\app\src\main\AndroidManifest.xml:31:17-69
 	android:name
-		ADDED from D:\PROYECTOS\NOMAD\PROTOTIPO\NOMAD\app-android\app\src\main\AndroidManifest.xml:30:25-66
+		ADDED from D:\PROYECTOS\NOMAD\PROTOTIPO\NOMAD\app-android\app\src\main\AndroidManifest.xml:31:25-66
 category#android.intent.category.LAUNCHER
-ADDED from D:\PROYECTOS\NOMAD\PROTOTIPO\NOMAD\app-android\app\src\main\AndroidManifest.xml:31:17-77
+ADDED from D:\PROYECTOS\NOMAD\PROTOTIPO\NOMAD\app-android\app\src\main\AndroidManifest.xml:32:17-77
 	android:name
-		ADDED from D:\PROYECTOS\NOMAD\PROTOTIPO\NOMAD\app-android\app\src\main\AndroidManifest.xml:31:27-74
+		ADDED from D:\PROYECTOS\NOMAD\PROTOTIPO\NOMAD\app-android\app\src\main\AndroidManifest.xml:32:27-74
 uses-sdk
 INJECTED from D:\PROYECTOS\NOMAD\PROTOTIPO\NOMAD\app-android\app\src\main\AndroidManifest.xml reason: use-sdk injection requested
 INJECTED from D:\PROYECTOS\NOMAD\PROTOTIPO\NOMAD\app-android\app\src\main\AndroidManifest.xml

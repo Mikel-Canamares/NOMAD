@@ -508,3 +508,4 @@ int[] styleable SignInButton { 0x7f010005, 0x7f01000e, 0x7f010039 }
 int styleable SignInButton_buttonSize 0
 int styleable SignInButton_colorScheme 1
 int styleable SignInButton_scopeUris 2
+int xml network_security_config 0x7f0c0000

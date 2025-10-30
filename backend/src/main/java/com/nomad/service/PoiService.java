@@ -18,7 +18,7 @@ public class PoiService {
         this.overpassService = overpassService;
     }
 
-    @Cacheable(value = "poiCache", key = "T(com.nomad.util.GeoHashUtil).generateCacheKey(#lat, #lng, #category)")
+    @Cacheable(value = "poiCache", key = "T(com.nomad.util.GeoHashUtil).generateCacheKey(#lat, #lng, #category) + '_' + #radius")
     public List<PoiResponse> getNearbyPois(double lat, double lng, double radius, String category) {
         List<JsonNode> elements = overpassService.queryPois(lat, lng, radius, category);
 

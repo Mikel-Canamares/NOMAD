@@ -1,6 +1,7 @@
 package com.nomad.app.ui.map
 
 import android.location.Location
+import android.util.Log
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -27,9 +28,9 @@ import com.google.maps.android.compose.MapUiSettings
 import com.google.maps.android.compose.Marker
 import com.google.maps.android.compose.MarkerState
 import com.google.maps.android.compose.rememberCameraPositionState
+import com.nomad.app.data.repository.PoiRepository
 import com.nomad.app.location.LocationManager
 import com.nomad.app.model.POI
-import com.nomad.app.model.SamplePOIs
 import kotlinx.coroutines.launch
 
 @Composable
@@ -40,12 +41,40 @@ fun MapScreen(
     var currentLocation by remember { mutableStateOf<Location?>(null) }
     var voiceState by remember { mutableStateOf(VoiceState.INACTIVE) }
     var showBottomSheet by remember { mutableStateOf(false) }
-    val pois = remember { SamplePOIs.madridPOIs }
+    var pois by remember { mutableStateOf<List<POI>>(emptyList()) }
+    var isLoadingPois by remember { mutableStateOf(false) }
+    var poisError by remember { mutableStateOf<String?>(null) }
+    val poiRepository = remember { PoiRepository() }
     val scope = rememberCoroutineScope()
 
     // Obtener ubicación actual
     LaunchedEffect(Unit) {
         currentLocation = locationManager.getCurrentLocation()
+    }
+
+    // Cargar POIs cercanos cuando se obtiene la ubicación
+    LaunchedEffect(currentLocation) {
+        currentLocation?.let { location ->
+            Log.d("MapScreen", "Cargando POIs para ubicación: ${location.latitude}, ${location.longitude}")
+            isLoadingPois = true
+            poisError = null
+
+            val result = poiRepository.getNearbyPois(
+                latitude = location.latitude,
+                longitude = location.longitude,
+                radiusMeters = 1000 // Reducido a 1km para evitar exceder límite del buffer
+            )
+
+            result.onSuccess { loadedPois ->
+                Log.d("MapScreen", "POIs cargados exitosamente: ${loadedPois.size} POIs")
+                pois = loadedPois
+            }.onFailure { error ->
+                Log.e("MapScreen", "Error cargando POIs: ${error.message}", error)
+                poisError = error.message
+            }
+
+            isLoadingPois = false
+        }
     }
 
     val defaultLocation = LatLng(40.4169, -3.7035) // Madrid centro
