@@ -42,6 +42,8 @@ logging:
 
 # API Keys (use environment variables or external config in production)
 api:
+  openai:
+    key: ${OPENAI_API_KEY:PLACEHOLDER_OPENAI_KEY}
   opentripmap:
     key: ${OPENTRIPMAP_API_KEY:PLACEHOLDER_OPENTRIPMAP_KEY}
   foursquare:
