@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.nomad.dto.RealtimeSessionResponse;
+import com.nomad.dto.realtime.ToolDefinition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -65,8 +66,18 @@ public class RealtimeService {
                 - Cuando falte contexto sobre ubicación o detalles de un POI, pregunta al usuario o usa las tools
                 - Sé conciso pero informativo
                 - Responde en el idioma del usuario
+
+                HERRAMIENTAS DISPONIBLES:
+                1. poi_nearby: Busca POIs cercanos a unas coordenadas (requiere lat, lng, radius)
+                2. poi_context: Obtiene información detallada de un POI específico (requiere name, lat, lng)
                 """;
             requestBody.put("instructions", instructions);
+
+            // Tools
+            ArrayNode tools = objectMapper.createArrayNode();
+            tools.add(objectMapper.valueToTree(ToolDefinition.poiNearby()));
+            tools.add(objectMapper.valueToTree(ToolDefinition.poiContext()));
+            requestBody.set("tools", tools);
 
             // Call OpenAI API
             JsonNode response = webClient.post()
