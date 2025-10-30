@@ -1,5 +1,7 @@
 package com.nomad.controller;
 
+import com.nomad.dto.PoiResponse;
+import com.nomad.service.PoiService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -8,7 +10,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Collections;
 import java.util.List;
 
 @RestController
@@ -17,9 +18,15 @@ import java.util.List;
 @Tag(name = "POI", description = "Points of Interest API")
 public class PoiController {
 
+    private final PoiService poiService;
+
+    public PoiController(PoiService poiService) {
+        this.poiService = poiService;
+    }
+
     @GetMapping("/nearby")
     @Operation(summary = "Get nearby POIs", description = "Returns points of interest near the given coordinates")
-    public ResponseEntity<List<Object>> getNearbyPois(
+    public ResponseEntity<List<PoiResponse>> getNearbyPois(
             @Parameter(description = "Latitude", required = true)
             @RequestParam @NotNull Double lat,
 
@@ -29,10 +36,10 @@ public class PoiController {
             @Parameter(description = "Search radius in meters", required = true)
             @RequestParam @NotNull Double radius,
 
-            @Parameter(description = "Category filter")
+            @Parameter(description = "Category filter (monument|museum|viewpoint|restaurant)")
             @RequestParam(required = false) String cat
     ) {
-        // TODO: Implement POI search logic
-        return ResponseEntity.ok(Collections.emptyList());
+        List<PoiResponse> pois = poiService.getNearbyPois(lat, lng, radius, cat);
+        return ResponseEntity.ok(pois);
     }
 }
