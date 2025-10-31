@@ -15,7 +15,8 @@ interface NomadApiService {
         @Query("lat") lat: Double,
         @Query("lng") lng: Double,
         @Query("radius") radius: Double,
-        @Query("cat") category: String? = null
+        @Query("cat") category: String? = null,
+        @Query("limit") limit: Int? = 25
     ): List<PoiDto>
 
     @POST("ask")

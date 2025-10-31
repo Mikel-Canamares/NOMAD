@@ -39,12 +39,11 @@ private fun PoiDto.buildDescription(): String {
 
 private fun mapCategory(category: String): POICategory {
     return when (category.lowercase()) {
-        "restaurant", "cafe", "bar" -> POICategory.RESTAURANT
-        "hotel", "hostel", "guest_house" -> POICategory.HOTEL
-        "monument", "attraction", "viewpoint", "artwork" -> POICategory.ATTRACTION
-        "museum", "gallery" -> POICategory.MUSEUM
-        "park", "garden" -> POICategory.PARK
-        "shop", "shopping" -> POICategory.SHOPPING
+        "monument" -> POICategory.MONUMENT
+        "museum" -> POICategory.MUSEUM
+        "viewpoint" -> POICategory.VIEWPOINT
+        "heritage" -> POICategory.HERITAGE
+        "park" -> POICategory.PARK
         else -> POICategory.OTHER
     }
 }

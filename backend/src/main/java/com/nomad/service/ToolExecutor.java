@@ -57,10 +57,11 @@ public class ToolExecutor {
         double lng = arguments.get("lng").asDouble();
         double radius = arguments.get("radius").asDouble();
         String cat = arguments.has("cat") ? arguments.get("cat").asText() : null;
+        int limit = arguments.has("limit") ? arguments.get("limit").asInt() : 25;
 
-        log.info("Executing poi_nearby: lat={}, lng={}, radius={}, cat={}", lat, lng, radius, cat);
+        log.info("Executing poi_nearby: lat={}, lng={}, radius={}, cat={}, limit={}", lat, lng, radius, cat, limit);
 
-        List<PoiResponse> pois = poiService.getNearbyPois(lat, lng, radius, cat);
+        List<PoiResponse> pois = poiService.getNearbyPois(lat, lng, radius, cat, limit);
 
         // Sanitize response - remove any internal details
         String jsonResult = objectMapper.writeValueAsString(pois);

@@ -13,6 +13,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -25,15 +27,19 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.nomad.app.model.POI
+import com.nomad.app.model.POICategory
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun POIBottomSheet(
     pois: List<POI>,
+    selectedCategory: POICategory?,
     onDismiss: () -> Unit,
     onPOIClick: (POI) -> Unit,
+    onTryAnotherCategory: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val sheetState = rememberModalBottomSheetState(
@@ -50,21 +56,30 @@ fun POIBottomSheet(
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 8.dp)
         ) {
-            Text(
-                text = "Puntos de Interés Cercanos",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
+            // Header con categoría activa
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.padding(bottom = 16.dp)
-            )
+            ) {
+                Text(
+                    text = if (selectedCategory != null) {
+                        "${selectedCategory.displayName} Cercanos"
+                    } else {
+                        "Puntos de Interés Cercanos"
+                    },
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+            }
 
             if (pois.isEmpty()) {
-                Text(
-                    text = "No hay puntos de interés cercanos",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(vertical = 32.dp)
+                // Empty state elegante
+                EmptyStateContent(
+                    selectedCategory = selectedCategory,
+                    onTryAnother = onTryAnotherCategory
                 )
             } else {
+                // Lista de POIs
                 LazyColumn(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.padding(bottom = 16.dp)
@@ -77,6 +92,51 @@ fun POIBottomSheet(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun EmptyStateContent(
+    selectedCategory: POICategory?,
+    onTryAnother: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 48.dp)
+    ) {
+        Icon(
+            imageVector = Icons.Default.Search,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(bottom = 16.dp)
+        )
+
+        Text(
+            text = "No encontramos ${selectedCategory?.displayName?.lowercase() ?: "lugares"} cerca",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Text(
+            text = "Intenta con otra categoría o amplía el radio de búsqueda",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(horizontal = 32.dp)
+        )
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Button(onClick = onTryAnother) {
+            Text("Probar otra categoría")
         }
     }
 }
@@ -115,7 +175,7 @@ fun POIListItem(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = poi.category.name.lowercase().replaceFirstChar { it.uppercase() },
+                    text = poi.category.displayName,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.secondary
                 )

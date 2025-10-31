@@ -6,6 +6,7 @@ import com.nomad.util.GeoHashUtil;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -18,13 +19,16 @@ public class PoiService {
         this.overpassService = overpassService;
     }
 
-    @Cacheable(value = "poiCache", key = "T(com.nomad.util.GeoHashUtil).generateCacheKey(#lat, #lng, #category) + '_' + #radius")
-    public List<PoiResponse> getNearbyPois(double lat, double lng, double radius, String category) {
+    @Cacheable(value = "poiCache", key = "T(com.nomad.util.GeoHashUtil).generateCacheKey(#lat, #lng, #category) + '_' + #radius + '_' + #limit")
+    public List<PoiResponse> getNearbyPois(double lat, double lng, double radius, String category, int limit) {
         List<JsonNode> elements = overpassService.queryPois(lat, lng, radius, category);
 
         return elements.stream()
             .map(element -> mapToPoiResponse(element, lat, lng))
             .filter(poi -> poi != null)
+            .sorted(Comparator.comparingDouble(poi ->
+                haversineDistance(lat, lng, poi.lat(), poi.lng())))
+            .limit(limit)
             .collect(Collectors.toList());
     }
 
@@ -46,7 +50,8 @@ public class PoiService {
             if (poiLat == 0 || poiLng == 0) return null;
 
             String category = extractCategory(tags);
-            double relevance = calculateRelevance(userLat, userLng, poiLat, poiLng);
+            double distance = haversineDistance(userLat, userLng, poiLat, poiLng);
+            double relevance = calculateRelevance(distance);
 
             return new PoiResponse(id, name, category, poiLat, poiLng, "OSM", "ODbL", relevance);
 
@@ -56,18 +61,41 @@ public class PoiService {
     }
 
     private String extractCategory(JsonNode tags) {
-        if (tags.has("tourism")) {
-            return tags.get("tourism").asText();
+        // Prioridad: historic > tourism > leisure > man_made > amenity
+        if (tags.has("historic")) {
+            String historic = tags.get("historic").asText();
+            return switch (historic) {
+                case "monument", "memorial" -> "monument";
+                case "castle", "fort", "palace", "city_gate", "archaeological_site", "ruins" -> "heritage";
+                default -> historic;
+            };
         }
-        if (tags.has("amenity") && tags.get("amenity").asText().equals("restaurant")) {
-            return "restaurant";
+        if (tags.has("tourism")) {
+            String tourism = tags.get("tourism").asText();
+            return switch (tourism) {
+                case "artwork" -> "monument";
+                default -> tourism;
+            };
+        }
+        if (tags.has("leisure")) {
+            String leisure = tags.get("leisure").asText();
+            return switch (leisure) {
+                case "park", "garden" -> "park";
+                default -> leisure;
+            };
+        }
+        if (tags.has("man_made") && tags.get("man_made").asText().equals("obelisk")) {
+            return "monument";
+        }
+        if (tags.has("amenity")) {
+            return tags.get("amenity").asText();
         }
         return "other";
     }
 
-    private double calculateRelevance(double lat1, double lng1, double lat2, double lng2) {
-        double distance = haversineDistance(lat1, lng1, lat2, lng2);
-        return Math.max(0.0, 1.0 - (distance / 10000.0)); // Normalize to 0-1, max 10km
+    private double calculateRelevance(double distance) {
+        // Relevance = 1 / (distance + 1), normalizado
+        return 1.0 / (distance + 1.0);
     }
 
     private double haversineDistance(double lat1, double lon1, double lat2, double lon2) {

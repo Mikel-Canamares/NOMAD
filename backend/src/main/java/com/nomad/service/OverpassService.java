@@ -18,18 +18,19 @@ public class OverpassService {
 
     private static final Logger log = LoggerFactory.getLogger(OverpassService.class);
     private static final String OVERPASS_URL = "https://overpass-api.de/api/interpreter";
+    private static final String USER_AGENT = "NomadApp/1.0 (Educational Project)";
 
     private final WebClient webClient;
 
     public OverpassService(WebClient.Builder webClientBuilder) {
         this.webClient = webClientBuilder
             .baseUrl(OVERPASS_URL)
+            .defaultHeader("User-Agent", USER_AGENT)
             .build();
     }
 
     public List<JsonNode> queryPois(double lat, double lng, double radiusMeters, String category) {
-        String osmTags = mapCategoryToOsmTags(category);
-        String query = buildOverpassQuery(lat, lng, radiusMeters, osmTags);
+        String query = buildOverpassQuery(lat, lng, radiusMeters, category);
 
         log.debug("Overpass query: {}", query);
 
@@ -40,7 +41,7 @@ public class OverpassService {
                     .build())
                 .retrieve()
                 .bodyToMono(JsonNode.class)
-                .timeout(Duration.ofSeconds(20))
+                .timeout(Duration.ofSeconds(25))
                 .retryWhen(Retry.backoff(3, Duration.ofSeconds(1))
                     .filter(this::shouldRetry)
                     .doBeforeRetry(retrySignal ->
@@ -55,32 +56,59 @@ public class OverpassService {
         }
     }
 
-    private String mapCategoryToOsmTags(String category) {
+    private String buildOverpassQuery(double lat, double lng, double radius, String category) {
+        StringBuilder query = new StringBuilder();
+        query.append("[out:json][timeout:25];(");
+
         if (category == null) {
-            return "tourism";
+            // Sin categoría: buscar todo tourism
+            query.append(String.format(Locale.US,
+                "nwr[\"tourism\"](around:%.1f,%.7f,%.7f);",
+                radius, lat, lng));
+        } else {
+            // Con categoría: construir UNION de tags según mapeo
+            List<String> tagFilters = getTagFiltersForCategory(category.toLowerCase());
+
+            for (int i = 0; i < tagFilters.size(); i++) {
+                if (i > 0) query.append("\n  ");
+                query.append(String.format(Locale.US,
+                    "nwr[%s](around:%.1f,%.7f,%.7f);",
+                    tagFilters.get(i), radius, lat, lng));
+            }
         }
-        return switch (category.toLowerCase()) {
-            case "monument" -> "tourism=monument";
-            case "museum" -> "tourism=museum";
-            case "viewpoint" -> "tourism=viewpoint";
-            case "restaurant" -> "amenity=restaurant";
-            default -> "tourism";
-        };
+
+        query.append(");out center;");
+        return query.toString();
     }
 
-    private String buildOverpassQuery(double lat, double lng, double radius, String tags) {
-        // Si tags no tiene "=", es una búsqueda genérica por clave (ej: "tourism")
-        if (!tags.contains("=")) {
-            return String.format(Locale.US,
-                "[out:json][timeout:20];(node[\"%s\"](around:%.1f,%.7f,%.7f);way[\"%s\"](around:%.1f,%.7f,%.7f););out center;",
-                tags, radius, lat, lng, tags, radius, lat, lng
+    private List<String> getTagFiltersForCategory(String category) {
+        return switch (category) {
+            case "monument" -> List.of(
+                "\"historic\"=\"monument\"",
+                "\"historic\"=\"memorial\"",
+                "\"tourism\"=\"artwork\"",
+                "\"man_made\"=\"obelisk\""
             );
-        }
-        // Si tags tiene "=", es una búsqueda específica (ej: "tourism=monument")
-        return String.format(Locale.US,
-            "[out:json][timeout:20];(node[%s](around:%.1f,%.7f,%.7f);way[%s](around:%.1f,%.7f,%.7f););out center;",
-            tags, radius, lat, lng, tags, radius, lat, lng
-        );
+            case "museum" -> List.of(
+                "\"tourism\"=\"museum\""
+            );
+            case "viewpoint" -> List.of(
+                "\"tourism\"=\"viewpoint\""
+            );
+            case "heritage" -> List.of(
+                "\"historic\"=\"castle\"",
+                "\"historic\"=\"fort\"",
+                "\"historic\"=\"palace\"",
+                "\"historic\"=\"city_gate\"",
+                "\"historic\"=\"archaeological_site\"",
+                "\"historic\"=\"ruins\""
+            );
+            case "park" -> List.of(
+                "\"leisure\"=\"park\"",
+                "\"leisure\"=\"garden\""
+            );
+            default -> List.of("\"tourism\"");
+        };
     }
 
     private List<JsonNode> extractElements(JsonNode response) {
