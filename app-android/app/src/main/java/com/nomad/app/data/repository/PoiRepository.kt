@@ -24,6 +24,7 @@ class PoiRepository {
         latitude: Double,
         longitude: Double,
         radiusMeters: Int = 1000,
+        category: String? = null,
         forceRefresh: Boolean = false
     ): Result<List<POI>> = withContext(Dispatchers.IO) {
         try {
@@ -35,11 +36,12 @@ class PoiRepository {
             }
 
             // Obtener datos del API
-            Log.d("PoiRepository", "Solicitando POIs desde API: lat=$latitude, lng=$longitude, radius=$radiusMeters")
+            Log.d("PoiRepository", "Solicitando POIs desde API: lat=$latitude, lng=$longitude, radius=$radiusMeters, category=$category")
             val poisDto = apiService.getNearbyPois(
                 lat = latitude,
                 lng = longitude,
-                radius = radiusMeters.toDouble()
+                radius = radiusMeters.toDouble(),
+                category = category
             )
             Log.d("PoiRepository", "Respuesta recibida: ${poisDto.size} POIs")
             val pois = poisDto.map { it.toPOI() }

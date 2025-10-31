@@ -42,6 +42,7 @@ fun MapScreen(
     var voiceState by remember { mutableStateOf(VoiceState.INACTIVE) }
     var showBottomSheet by remember { mutableStateOf(false) }
     var pois by remember { mutableStateOf<List<POI>>(emptyList()) }
+    var selectedPoi by remember { mutableStateOf<POI?>(null) }
     var isLoadingPois by remember { mutableStateOf(false) }
     var poisError by remember { mutableStateOf<String?>(null) }
     val poiRepository = remember { PoiRepository() }
@@ -62,7 +63,8 @@ fun MapScreen(
             val result = poiRepository.getNearbyPois(
                 latitude = location.latitude,
                 longitude = location.longitude,
-                radiusMeters = 1000 // Reducido a 1km para evitar exceder límite del buffer
+                radiusMeters = 1500,
+                category = null // Buscar todos los POIs de turismo
             )
 
             result.onSuccess { loadedPois ->
@@ -110,7 +112,16 @@ fun MapScreen(
                 Marker(
                     state = MarkerState(position = poi.location),
                     title = poi.name,
-                    snippet = poi.description
+                    snippet = poi.description,
+                    onClick = {
+                        selectedPoi = poi
+                        scope.launch {
+                            cameraPositionState.animate(
+                                CameraUpdateFactory.newLatLngZoom(poi.location, 16f)
+                            )
+                        }
+                        true
+                    }
                 )
             }
         }

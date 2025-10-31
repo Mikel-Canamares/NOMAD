@@ -115,6 +115,12 @@ fun POIListItem(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
+                    text = poi.category.name.lowercase().replaceFirstChar { it.uppercase() },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.secondary
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
                     text = poi.description,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant

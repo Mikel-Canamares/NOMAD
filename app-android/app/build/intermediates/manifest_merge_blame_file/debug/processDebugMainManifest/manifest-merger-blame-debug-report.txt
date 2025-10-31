@@ -76,7 +76,7 @@
 48        <meta-data
 49            android:name="com.google.android.geo.API_KEY"
 49-->D:\PROYECTOS\NOMAD\PROTOTIPO\NOMAD\app-android\app\src\main\AndroidManifest.xml:23:13-58
-50            android:value="AIzaSyCxwlzMgq3z9JVjYODzxw8LV0mp-jgmNEQ" />
+50            android:value="AIzaSyBv6nRCs-qwYuHDknl3ioaBYZYrQ1FVTfA" />
 50-->D:\PROYECTOS\NOMAD\PROTOTIPO\NOMAD\app-android\app\src\main\AndroidManifest.xml:24:13-44
 51
 52        <activity

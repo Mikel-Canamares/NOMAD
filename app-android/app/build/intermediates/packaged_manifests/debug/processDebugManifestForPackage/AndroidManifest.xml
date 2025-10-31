@@ -47,7 +47,7 @@
         <!-- Google Maps API Key -->
         <meta-data
             android:name="com.google.android.geo.API_KEY"
-            android:value="AIzaSyCxwlzMgq3z9JVjYODzxw8LV0mp-jgmNEQ" />
+            android:value="AIzaSyBv6nRCs-qwYuHDknl3ioaBYZYrQ1FVTfA" />
 
         <activity
             android:name="com.nomad.app.MainActivity"
