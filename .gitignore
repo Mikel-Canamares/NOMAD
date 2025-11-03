@@ -1,4 +1,5 @@
 .env
+.gradle
 
 # Android secrets
 secrets.properties

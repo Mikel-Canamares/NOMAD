@@ -62,6 +62,7 @@ fun MapScreen(
     var isLoadingPois by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var showInfoBottomSheet by remember { mutableStateOf(false) }
+    var showMarkerDetailSheet by remember { mutableStateOf(false) }
     var askResponse by remember { mutableStateOf<AskResponse?>(null) }
     var isLoadingAsk by remember { mutableStateOf(false) }
     val poiRepository = remember { PoiRepository() }
@@ -170,10 +171,30 @@ fun MapScreen(
                         onClick = {
                             selectedPoi = poi
                             selectedPoiId = poi.id
+                            showMarkerDetailSheet = true
+                            isLoadingAsk = true
+
                             scope.launch {
+                                // Animar cámara
                                 cameraPositionState.animate(
                                     CameraUpdateFactory.newLatLngZoom(poi.location, 16f)
                                 )
+
+                                // Llamar al endpoint /ask
+                                val result = askRepository.ask(
+                                    text = poi.name,
+                                    locale = "es",
+                                    poiId = poi.id
+                                )
+
+                                result.onSuccess { response ->
+                                    askResponse = response
+                                    isLoadingAsk = false
+                                }.onFailure { error ->
+                                    Log.e("MapScreen", "Error loading POI details: ${error.message}")
+                                    askResponse = null
+                                    isLoadingAsk = false
+                                }
                             }
                             true
                         }
@@ -265,7 +286,7 @@ fun MapScreen(
             )
         }
 
-        // Bottom Sheet de información del POI
+        // Bottom Sheet de información del POI (desde lista con botón "Más info")
         if (showInfoBottomSheet && selectedPoi != null) {
             POIInfoBottomSheet(
                 poi = selectedPoi!!,
@@ -274,6 +295,20 @@ fun MapScreen(
                 onDismiss = {
                     showInfoBottomSheet = false
                     askResponse = null
+                }
+            )
+        }
+
+        // Bottom Sheet de detalles del POI (desde marker click)
+        if (showMarkerDetailSheet && selectedPoi != null) {
+            POIDetailBottomSheet(
+                poiName = selectedPoi!!.name,
+                askResponse = askResponse,
+                isLoading = isLoadingAsk,
+                onDismiss = {
+                    showMarkerDetailSheet = false
+                    askResponse = null
+                    selectedPoi = null
                 }
             )
         }
