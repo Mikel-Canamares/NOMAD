@@ -13,4 +13,35 @@ local.properties
 *.aab
 .gradle/
 build/
+**/build/
 captures/
+*.dex
+*.class
+
+# Android Studio
+.idea/
+*.iml
+.DS_Store
+
+# Backend build (Gradle)
+backend/.gradle/
+backend/build/
+backend/bin/
+backend/out/
+
+# Android app build
+app-android/.gradle/
+app-android/app/build/
+app-android/build/
+app-android/.cxx/
+app-android/app/.cxx/
+
+# Gradle wrapper (keep the wrapper jar, ignore temporary files)
+.gradle/
+gradle/wrapper/gradle-wrapper.jar
+
+# Cache and temp files
+*.log
+*.tmp
+*.cache
+.externalNativeBuild/
