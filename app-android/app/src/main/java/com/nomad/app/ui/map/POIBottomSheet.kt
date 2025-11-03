@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
@@ -19,6 +20,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
@@ -40,6 +42,7 @@ fun POIBottomSheet(
     onDismiss: () -> Unit,
     onPOIClick: (POI) -> Unit,
     onTryAnotherCategory: () -> Unit,
+    onMoreInfoClick: (POI) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val sheetState = rememberModalBottomSheetState(
@@ -87,7 +90,8 @@ fun POIBottomSheet(
                     items(pois) { poi ->
                         POIListItem(
                             poi = poi,
-                            onClick = { onPOIClick(poi) }
+                            onClick = { onPOIClick(poi) },
+                            onMoreInfoClick = { onMoreInfoClick(poi) }
                         )
                     }
                 }
@@ -145,6 +149,7 @@ private fun EmptyStateContent(
 fun POIListItem(
     poi: POI,
     onClick: () -> Unit,
+    onMoreInfoClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -193,6 +198,15 @@ fun POIListItem(
                         color = MaterialTheme.colorScheme.primary
                     )
                 }
+            }
+
+            // Botón "Más info"
+            IconButton(onClick = onMoreInfoClick) {
+                Icon(
+                    imageVector = Icons.Default.Info,
+                    contentDescription = "Más información",
+                    tint = MaterialTheme.colorScheme.primary
+                )
             }
         }
     }

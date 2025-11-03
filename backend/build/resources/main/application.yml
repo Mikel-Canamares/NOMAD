@@ -4,7 +4,7 @@ spring:
 
   cache:
     type: caffeine
-    cache-names: poiCache, askCache
+    cache-names: poiCache, askCache, placeDetailsCache
     caffeine:
       spec: maximumSize=1000,expireAfterWrite=30m
 
@@ -37,8 +37,22 @@ management:
 logging:
   level:
     com.nomad.service.OverpassService: DEBUG
+    com.nomad.service.GooglePlacesService: DEBUG
     com.nomad.service.AskService: INFO
     com.nomad.service.aggregator: INFO
+
+# POI Source Configuration
+nearby:
+  source: google_places  # valores: google_places | osm | mixed
+
+# Aggregator Configuration (disable legacy sources for /ask)
+aggregator:
+  enable:
+    osm: false
+    wikidata: false
+    wikipedia: false
+    opentripmap: false
+    foursquare: false
 
 # API Keys (use environment variables or external config in production)
 api:
@@ -48,6 +62,8 @@ api:
     key: ${OPENTRIPMAP_API_KEY:PLACEHOLDER_OPENTRIPMAP_KEY}
   foursquare:
     key: ${FOURSQUARE_API_KEY:PLACEHOLDER_FOURSQUARE_KEY}
-  google:
-    places:
-      key: ${GOOGLE_PLACES_API_KEY:PLACEHOLDER_GOOGLE_KEY}
+
+googleplaces:
+  api-key: ${GOOGLE_PLACES_API_KEY:PLACEHOLDER_GOOGLE_KEY}
+  language-code: ${GOOGLE_PLACES_LANG:es}
+  region-code: ${GOOGLE_PLACES_REGION:ES}

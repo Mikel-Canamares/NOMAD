@@ -9,6 +9,7 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -23,10 +24,16 @@ import java.util.Set;
 public class PoiController {
 
     private static final Set<String> VALID_CATEGORIES = Set.of(
-        "monument", "museum", "viewpoint", "heritage", "park"
+        "restaurant", "monument", "museum", "viewpoint", "heritage", "park"
     );
 
     private final PoiService poiService;
+
+    @Value("${googleplaces.language-code}")
+    private String defaultLanguageCode;
+
+    @Value("${googleplaces.region-code}")
+    private String defaultRegionCode;
 
     public PoiController(PoiService poiService) {
         this.poiService = poiService;
@@ -44,12 +51,18 @@ public class PoiController {
             @Parameter(description = "Search radius in meters", required = true)
             @RequestParam @NotNull Double radius,
 
-            @Parameter(description = "Category filter: monument | museum | viewpoint | heritage | park")
+            @Parameter(description = "Category filter: restaurant | monument | museum | viewpoint | heritage | park")
             @RequestParam(required = false) String cat,
 
-            @Parameter(description = "Maximum number of results (default: 25, max: 50)")
-            @RequestParam(required = false, defaultValue = "25")
-            @Min(1) @Max(50) Integer limit
+            @Parameter(description = "Maximum number of results (default: 15, max: 20)")
+            @RequestParam(required = false, defaultValue = "15")
+            @Min(1) @Max(20) Integer limit,
+
+            @Parameter(description = "Locale (e.g., 'es' or 'es-ES'). Defaults to 'es'")
+            @RequestParam(required = false) String locale,
+
+            @Parameter(description = "Region code (e.g., 'ES'). Defaults to 'ES'")
+            @RequestParam(required = false) String region
     ) {
         // Validar categoría si se proporciona
         if (cat != null && !VALID_CATEGORIES.contains(cat.toLowerCase())) {
@@ -58,7 +71,36 @@ public class PoiController {
             );
         }
 
-        List<PoiResponse> pois = poiService.getNearbyPois(lat, lng, radius, cat, limit);
+        // Normalizar locale y region
+        String[] normalized = normalizeLocaleAndRegion(locale, region);
+        String languageCode = normalized[0];
+        String regionCode = normalized[1];
+
+        List<PoiResponse> pois = poiService.getNearbyPois(lat, lng, radius, cat, limit, languageCode, regionCode);
         return ResponseEntity.ok(pois);
+    }
+
+    private String[] normalizeLocaleAndRegion(String locale, String region) {
+        String languageCode = defaultLanguageCode;
+        String regionCode = defaultRegionCode;
+
+        if (locale != null && !locale.isBlank()) {
+            // Parse "es-ES" → lang="es", region="ES"
+            if (locale.contains("-")) {
+                String[] parts = locale.split("-");
+                languageCode = parts[0].toLowerCase();
+                if (region == null && parts.length > 1) {
+                    regionCode = parts[1].toUpperCase();
+                }
+            } else {
+                languageCode = locale.toLowerCase();
+            }
+        }
+
+        if (region != null && !region.isBlank()) {
+            regionCode = region.toUpperCase();
+        }
+
+        return new String[]{languageCode, regionCode};
     }
 }

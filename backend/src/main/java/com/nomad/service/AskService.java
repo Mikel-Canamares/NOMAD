@@ -1,13 +1,12 @@
 package com.nomad.service;
 
-import com.nomad.dto.AskRequest;
-import com.nomad.dto.AskResponse;
-import com.nomad.dto.PoiResponse;
-import com.nomad.dto.SourceReference;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.nomad.dto.*;
 import com.nomad.service.aggregator.*;
 import com.nomad.util.GeoHashUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
@@ -17,8 +16,10 @@ import java.util.*;
 public class AskService {
 
     private static final Logger log = LoggerFactory.getLogger(AskService.class);
+    private static final int MARKDOWN_MAX_LENGTH = 1000;
 
     private final PoiService poiService;
+    private final GooglePlacesDetailsClient placesDetailsClient;
     private final OsmAggregator osmAggregator;
     private final WikidataAggregator wikidataAggregator;
     private final WikipediaAggregator wikipediaAggregator;
@@ -26,7 +27,29 @@ public class AskService {
     private final FoursquareAggregator foursquareAggregator;
     private final GooglePlacesAggregator googlePlacesAggregator;
 
+    @Value("${aggregator.enable.osm:false}")
+    private boolean enableOsm;
+
+    @Value("${aggregator.enable.wikidata:false}")
+    private boolean enableWikidata;
+
+    @Value("${aggregator.enable.wikipedia:false}")
+    private boolean enableWikipedia;
+
+    @Value("${aggregator.enable.opentripmap:false}")
+    private boolean enableOpenTripMap;
+
+    @Value("${aggregator.enable.foursquare:false}")
+    private boolean enableFoursquare;
+
+    @Value("${googleplaces.language-code}")
+    private String defaultLanguageCode;
+
+    @Value("${googleplaces.region-code}")
+    private String defaultRegionCode;
+
     public AskService(PoiService poiService,
+                      GooglePlacesDetailsClient placesDetailsClient,
                       OsmAggregator osmAggregator,
                       WikidataAggregator wikidataAggregator,
                       WikipediaAggregator wikipediaAggregator,
@@ -34,6 +57,7 @@ public class AskService {
                       FoursquareAggregator foursquareAggregator,
                       GooglePlacesAggregator googlePlacesAggregator) {
         this.poiService = poiService;
+        this.placesDetailsClient = placesDetailsClient;
         this.osmAggregator = osmAggregator;
         this.wikidataAggregator = wikidataAggregator;
         this.wikipediaAggregator = wikipediaAggregator;
@@ -44,7 +68,197 @@ public class AskService {
 
     @Cacheable(value = "askCache", key = "#request.poiId() != null ? #request.poiId() + ':' + #request.locale() : T(com.nomad.util.GeoHashUtil).generateCacheKey(#lat, #lng, #request.text() + ':' + #request.locale())")
     public AskResponse aggregateInformation(AskRequest request, Double lat, Double lng) {
-        log.info("Aggregating information for request: {}", request);
+        log.info("Ask request: poiId={}, text={}, locale={}, lat={}, lng={}",
+                request.poiId(), request.text(), request.locale(), lat, lng);
+
+        String placeId = null;
+        String poiName = request.text();
+        Double poiLat = lat;
+        Double poiLng = lng;
+        String category = null;
+
+        // Step 1: Handle poiId if provided (format: "gplaces:<place_id>")
+        if (request.poiId() != null && !request.poiId().isBlank()) {
+            if (request.poiId().startsWith("gplaces:")) {
+                placeId = request.poiId().substring(8); // Remove "gplaces:" prefix
+                log.info("Using provided Google Places ID: {}", placeId);
+            } else {
+                log.warn("Invalid poiId format: {}. Expected 'gplaces:<place_id>'", request.poiId());
+            }
+        }
+
+        // Step 2: If no placeId, try to resolve from /poi/nearby
+        if (placeId == null && poiLat != null && poiLng != null) {
+            log.debug("No poiId provided, resolving candidate from /poi/nearby");
+            String[] normalized = normalizeLocale(request.locale());
+            List<PoiResponse> nearbyPois = poiService.getNearbyPois(poiLat, poiLng, 100.0, null, 1, normalized[0], normalized[1]);
+
+            if (!nearbyPois.isEmpty()) {
+                PoiResponse candidate = nearbyPois.get(0);
+                if (candidate.id() != null && candidate.id().startsWith("gplaces:")) {
+                    placeId = candidate.id().substring(8);
+                    poiName = candidate.name();
+                    poiLat = candidate.lat();
+                    poiLng = candidate.lng();
+                    category = candidate.category();
+                    log.info("Resolved candidate: name={}, placeId={}", poiName, placeId);
+                }
+            }
+        }
+
+        // Step 3: Fetch Google Places Details
+        if (placeId != null) {
+            return buildResponseFromPlacesDetails(placeId, poiName, poiLat, poiLng, category, request.locale());
+        }
+
+        // Step 4: Fallback to legacy aggregators if enabled (should be disabled)
+        if (enableOsm || enableWikidata || enableWikipedia || enableOpenTripMap || enableFoursquare) {
+            return legacyAggregation(request, lat, lng);
+        }
+
+        // Step 5: No data available
+        log.warn("No data available for request");
+        return createNoDataResponse(poiName, poiLat, poiLng, category, request.poiId());
+    }
+
+    private AskResponse buildResponseFromPlacesDetails(
+            String placeId,
+            String poiName,
+            Double lat,
+            Double lng,
+            String category,
+            String locale
+    ) {
+        String[] normalized = normalizeLocale(locale);
+        String languageCode = normalized[0];
+        String regionCode = normalized[1];
+
+        JsonNode details = placesDetailsClient.getPlaceDetails(placeId, languageCode, regionCode);
+
+        if (details == null) {
+            log.warn("Failed to fetch Places Details for placeId={}", placeId);
+            return createNoDataResponse(poiName, lat, lng, category, "gplaces:" + placeId);
+        }
+
+        // Extract fields from Google Places API (New)
+        String displayName = extractDisplayName(details);
+        JsonNode location = details.has("location") ? details.get("location") : null;
+        String websiteUri = details.has("websiteUri") ? details.get("websiteUri").asText() : null;
+        String googleMapsUri = details.has("googleMapsUri") ? details.get("googleMapsUri").asText() : null;
+        String primaryType = details.has("primaryType") ? details.get("primaryType").asText() : null;
+
+        // Update name and location if available
+        if (displayName != null) {
+            poiName = displayName;
+        }
+        if (location != null) {
+            lat = location.has("latitude") ? location.get("latitude").asDouble() : lat;
+            lng = location.has("longitude") ? location.get("longitude").asDouble() : lng;
+        }
+
+        // Build facts
+        Map<String, Object> facts = new HashMap<>();
+        if (websiteUri != null) {
+            facts.put("official_site", websiteUri);
+        }
+
+        // Build sources
+        List<SourceReference> sources = new ArrayList<>();
+        if (googleMapsUri != null) {
+            sources.add(new SourceReference("Google Maps", googleMapsUri));
+        }
+        if (websiteUri != null) {
+            sources.add(new SourceReference("Sitio oficial", websiteUri));
+        }
+
+        // Build POI info
+        PoiInfo poi = new PoiInfo(
+                "gplaces:" + placeId,
+                poiName,
+                lat,
+                lng,
+                category != null ? category : primaryType,
+                0.95
+        );
+
+        // Build markdown (≤800-1000 chars, factual and sober)
+        String markdown = buildMinimalMarkdown(poiName, facts, sources);
+
+        return new AskResponse(
+                markdown,
+                facts,
+                poi,
+                sources,
+                List.of("GooglePlaces"),
+                false
+        );
+    }
+
+    private String extractDisplayName(JsonNode details) {
+        if (details.has("displayName")) {
+            JsonNode displayName = details.get("displayName");
+            if (displayName.has("text")) {
+                return displayName.get("text").asText();
+            }
+        }
+        return null;
+    }
+
+    private String buildMinimalMarkdown(String name, Map<String, Object> facts, List<SourceReference> sources) {
+        StringBuilder md = new StringBuilder();
+
+        md.append("## ").append(name != null ? name : "Point of Interest").append("\n\n");
+
+        // Keep it minimal and factual (≤800-1000 chars)
+        if (facts.containsKey("official_site")) {
+            md.append("**Website:** ").append(facts.get("official_site")).append("\n\n");
+        }
+
+        if (!sources.isEmpty()) {
+            md.append("### Sources\n\n");
+            for (SourceReference source : sources) {
+                md.append("- [").append(source.title()).append("](").append(source.url()).append(")\n");
+            }
+        }
+
+        String result = md.toString();
+
+        // Truncate if exceeds 1000 chars
+        if (result.length() > MARKDOWN_MAX_LENGTH) {
+            result = result.substring(0, MARKDOWN_MAX_LENGTH - 3) + "...";
+        }
+
+        return result;
+    }
+
+    private AskResponse createNoDataResponse(String name, Double lat, Double lng, String category, String poiId) {
+        PoiInfo poi = null;
+        if (lat != null && lng != null) {
+            poi = new PoiInfo(
+                    poiId != null ? poiId : "unknown",
+                    name != null ? name : "Unknown location",
+                    lat,
+                    lng,
+                    category,
+                    0.5
+            );
+        }
+
+        String markdown = "No detailed information available for this location.";
+
+        return new AskResponse(
+                markdown,
+                new HashMap<>(),
+                poi,
+                new ArrayList<>(),
+                List.of("GooglePlaces"),
+                true
+        );
+    }
+
+    // Legacy aggregation method (should not be used when all flags are false)
+    private AskResponse legacyAggregation(AskRequest request, Double lat, Double lng) {
+        log.warn("Using legacy aggregation (should be disabled!)");
 
         Map<String, Object> facts = new HashMap<>();
         List<SourceReference> sources = new ArrayList<>();
@@ -54,65 +268,60 @@ public class AskService {
         Double poiLat = lat;
         Double poiLng = lng;
 
-        // Step 1: If poiId is provided, get POI details from cache
-        if (request.poiId() != null && !request.poiId().isBlank()) {
-            log.info("Source: Looking up POI from cache with id={}", request.poiId());
-            // TODO: Implement actual POI lookup from cache
-            // For now, we'll use the provided coordinates
-        }
-
         if (poiLat == null || poiLng == null) {
-            log.warn("No coordinates available for aggregation");
-            return createMinimalResponse(facts, sources, usedSources);
+            return createNoDataResponse(poiName, null, null, null, request.poiId());
         }
 
-        // Step 2a: OSM data
-        Map<String, Object> osmData = osmAggregator.searchByCoordinates(poiLat, poiLng, 100);
-        if (!osmData.isEmpty()) {
-            usedSources.add("OSM");
-            sources.add(osmAggregator.getSourceReference());
-            facts.putAll(osmData);
-
-            // Use OSM name if available
-            if (osmData.containsKey("name")) {
-                poiName = (String) osmData.get("name");
+        // OSM
+        if (enableOsm) {
+            Map<String, Object> osmData = osmAggregator.searchByCoordinates(poiLat, poiLng, 100);
+            if (!osmData.isEmpty()) {
+                usedSources.add("OSM");
+                sources.add(osmAggregator.getSourceReference());
+                facts.putAll(osmData);
+                if (osmData.containsKey("name")) {
+                    poiName = (String) osmData.get("name");
+                }
             }
         }
 
-        // Step 2b: Wikidata
-        String wikidataQid = (String) osmData.get("wikidata_qid");
-        if (wikidataQid != null) {
-            log.info("Source: Wikidata with QID={}", wikidataQid);
-            Map<String, Object> wikidataData = wikidataAggregator.getEntityData(wikidataQid);
-            if (!wikidataData.isEmpty()) {
-                usedSources.add("Wikidata");
-                sources.add(wikidataAggregator.getSourceReference(wikidataQid));
-                facts.putAll(wikidataData);
+        // Wikidata
+        if (enableWikidata) {
+            String wikidataQid = (String) facts.get("wikidata_qid");
+            if (wikidataQid != null) {
+                Map<String, Object> wikidataData = wikidataAggregator.getEntityData(wikidataQid);
+                if (!wikidataData.isEmpty()) {
+                    usedSources.add("Wikidata");
+                    sources.add(wikidataAggregator.getSourceReference(wikidataQid));
+                    facts.putAll(wikidataData);
+                }
             }
         }
 
-        // Step 2c: Wikipedia
-        String wikipediaTitle = (String) osmData.getOrDefault("wikipedia_title",
-                                facts.get("wikipedia_title"));
-        if (wikipediaTitle != null) {
-            log.info("Source: Wikipedia with title={}", wikipediaTitle);
-            String extract = wikipediaAggregator.getExtract(wikipediaTitle, request.locale());
-            if (extract != null && !extract.isBlank()) {
-                usedSources.add("Wikipedia");
-                sources.add(wikipediaAggregator.getSourceReference(wikipediaTitle, request.locale()));
-                facts.put("wikipedia_extract", extract);
+        // Wikipedia
+        if (enableWikipedia) {
+            String wikipediaTitle = (String) facts.get("wikipedia_title");
+            if (wikipediaTitle != null) {
+                String extract = wikipediaAggregator.getExtract(wikipediaTitle, request.locale());
+                if (extract != null && !extract.isBlank()) {
+                    usedSources.add("Wikipedia");
+                    sources.add(wikipediaAggregator.getSourceReference(wikipediaTitle, request.locale()));
+                    facts.put("wikipedia_extract", extract);
+                }
             }
         }
 
-        // Step 2d: OpenTripMap
-        Map<String, Object> otmData = openTripMapAggregator.searchByCoordinates(poiLat, poiLng, 100);
-        if (!otmData.isEmpty()) {
-            usedSources.add("OpenTripMap");
-            facts.putAll(otmData);
+        // OpenTripMap
+        if (enableOpenTripMap) {
+            Map<String, Object> otmData = openTripMapAggregator.searchByCoordinates(poiLat, poiLng, 100);
+            if (!otmData.isEmpty()) {
+                usedSources.add("OpenTripMap");
+                facts.putAll(otmData);
+            }
         }
 
-        // Step 2e: Foursquare
-        if (poiName != null) {
+        // Foursquare
+        if (enableFoursquare && poiName != null) {
             Map<String, Object> foursquareData = foursquareAggregator.searchPlace(poiName, poiLat, poiLng);
             if (!foursquareData.isEmpty()) {
                 usedSources.add("Foursquare");
@@ -120,91 +329,37 @@ public class AskService {
             }
         }
 
-        // Step 2f: Google Places
-        if (poiName != null) {
-            Map<String, Object> googleData = googlePlacesAggregator.searchPlace(poiName, poiLat, poiLng);
-            if (!googleData.isEmpty()) {
-                usedSources.add("GooglePlaces");
-                facts.putAll(googleData);
-            }
-        }
+        String markdown = buildMinimalMarkdown(poiName, facts, sources);
 
-        // Step 3: Build markdown response
-        String markdown = buildMarkdownResponse(poiName, facts, usedSources);
+        PoiInfo poi = new PoiInfo(
+                request.poiId() != null ? request.poiId() : "unknown",
+                poiName,
+                poiLat,
+                poiLng,
+                null,
+                0.7
+        );
 
-        log.info("Aggregation complete: {} sources used, {} facts collected", usedSources.size(), facts.size());
-
-        return new AskResponse(markdown, facts, sources, usedSources);
+        return new AskResponse(markdown, facts, poi, sources, usedSources, facts.isEmpty());
     }
 
-    private String buildMarkdownResponse(String poiName, Map<String, Object> facts, List<String> usedSources) {
-        StringBuilder md = new StringBuilder();
+    private String[] normalizeLocale(String locale) {
+        String languageCode = defaultLanguageCode;
+        String regionCode = defaultRegionCode;
 
-        md.append("# ").append(poiName != null ? poiName : "Point of Interest").append("\n\n");
-
-        // Wikipedia extract
-        if (facts.containsKey("wikipedia_extract")) {
-            md.append(facts.get("wikipedia_extract")).append("\n\n");
-        }
-
-        // Key facts
-        md.append("## Information\n\n");
-
-        if (facts.containsKey("inception_year")) {
-            md.append("**Year:** ").append(facts.get("inception_year")).append("\n\n");
-        }
-
-        if (facts.containsKey("style")) {
-            md.append("**Style:** ").append(facts.get("style")).append("\n\n");
-        }
-
-        if (facts.containsKey("heritage")) {
-            md.append("**Heritage:** ").append(facts.get("heritage")).append("\n\n");
-        }
-
-        // Contact & Practical Info
-        if (facts.containsKey("website") || facts.containsKey("official_site") ||
-            facts.containsKey("phone") || facts.containsKey("address")) {
-            md.append("## Contact & Location\n\n");
-
-            if (facts.containsKey("address")) {
-                md.append("**Address:** ").append(facts.get("address")).append("\n\n");
-            }
-
-            if (facts.containsKey("phone")) {
-                md.append("**Phone:** ").append(facts.get("phone")).append("\n\n");
-            }
-
-            String website = (String) facts.getOrDefault("official_site", facts.get("website"));
-            if (website != null) {
-                md.append("**Website:** ").append(website).append("\n\n");
+        if (locale != null && !locale.isBlank()) {
+            // Parse "es-ES" → lang="es", region="ES"
+            if (locale.contains("-")) {
+                String[] parts = locale.split("-");
+                languageCode = parts[0].toLowerCase();
+                if (parts.length > 1) {
+                    regionCode = parts[1].toUpperCase();
+                }
+            } else {
+                languageCode = locale.toLowerCase();
             }
         }
 
-        // Rating
-        if (facts.containsKey("rating")) {
-            md.append("**Rating:** ").append(facts.get("rating"));
-            if (facts.containsKey("user_ratings_total")) {
-                md.append(" (").append(facts.get("user_ratings_total")).append(" reviews)");
-            }
-            md.append("\n\n");
-        }
-
-        // Opening hours
-        if (facts.containsKey("opening_hours")) {
-            md.append("**Opening Hours:** ").append(facts.get("opening_hours")).append("\n\n");
-        }
-
-        md.append("---\n\n");
-        md.append("*Data aggregated from: ").append(String.join(", ", usedSources)).append("*");
-
-        return md.toString();
-    }
-
-    private AskResponse createMinimalResponse(Map<String, Object> facts,
-                                               List<SourceReference> sources,
-                                               List<String> usedSources) {
-        String markdown = "No detailed information available for this location.";
-        return new AskResponse(markdown, facts, sources, usedSources);
+        return new String[]{languageCode, regionCode};
     }
 }

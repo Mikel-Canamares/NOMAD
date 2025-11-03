@@ -13,7 +13,7 @@ public record AskRequest(
     @Schema(description = "Locale for response (e.g., en, es)", example = "en")
     String locale,
 
-    @Schema(description = "Optional POI ID for context", example = "poi123")
+    @Schema(description = "Optional POI ID (format: gplaces:<place_id>)", example = "gplaces:ChIJN1t_tDeuEmsRUsoyG83frY4")
     String poiId
 ) {
 }

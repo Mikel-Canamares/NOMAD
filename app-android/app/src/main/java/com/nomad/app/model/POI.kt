@@ -15,21 +15,23 @@ data class POI(
 )
 
 enum class POICategory(val displayName: String, val apiValue: String) {
-    MONUMENT("Monumentos", "monument"),
+    RESTAURANT("Restaurantes", "restaurant"),
     MUSEUM("Museos", "museum"),
+    PARK("Parques", "park"),
+    MONUMENT("Monumentos", "monument"),
     VIEWPOINT("Miradores", "viewpoint"),
     HERITAGE("Patrimonio", "heritage"),
-    PARK("Parques", "park"),
     OTHER("Otros", "")
 }
 
 // Lista de categorías para filtros
 fun getAvailableCategories(): List<POICategory> {
     return listOf(
-        POICategory.MONUMENT,
+        POICategory.RESTAURANT,
         POICategory.MUSEUM,
+        POICategory.PARK,
+        POICategory.MONUMENT,
         POICategory.VIEWPOINT,
-        POICategory.HERITAGE,
-        POICategory.PARK
+        POICategory.HERITAGE
     )
 }

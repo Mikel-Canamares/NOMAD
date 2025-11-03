@@ -38,6 +38,8 @@ import com.google.maps.android.compose.MapUiSettings
 import com.google.maps.android.compose.Marker
 import com.google.maps.android.compose.MarkerState
 import com.google.maps.android.compose.rememberCameraPositionState
+import com.nomad.app.data.dto.AskResponse
+import com.nomad.app.data.repository.AskRepository
 import com.nomad.app.data.repository.PoiRepository
 import com.nomad.app.location.LocationManager
 import com.nomad.app.model.POI
@@ -55,10 +57,15 @@ fun MapScreen(
     var showBottomSheet by remember { mutableStateOf(false) }
     var pois by remember { mutableStateOf<List<POI>>(emptyList()) }
     var selectedPoi by remember { mutableStateOf<POI?>(null) }
+    var selectedPoiId by remember { mutableStateOf<String?>(null) }
     var selectedCategory by remember { mutableStateOf<POICategory?>(POICategory.MONUMENT) }
     var isLoadingPois by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var showInfoBottomSheet by remember { mutableStateOf(false) }
+    var askResponse by remember { mutableStateOf<AskResponse?>(null) }
+    var isLoadingAsk by remember { mutableStateOf(false) }
     val poiRepository = remember { PoiRepository() }
+    val askRepository = remember { AskRepository() }
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -79,7 +86,7 @@ fun MapScreen(
                 longitude = location.longitude,
                 radiusMeters = 1200,
                 category = selectedCategory?.apiValue,
-                limit = 25
+                limit = 15
             )
 
             result.onSuccess { loadedPois ->
@@ -162,6 +169,7 @@ fun MapScreen(
                         snippet = poi.description,
                         onClick = {
                             selectedPoi = poi
+                            selectedPoiId = poi.id
                             scope.launch {
                                 cameraPositionState.animate(
                                     CameraUpdateFactory.newLatLngZoom(poi.location, 16f)
@@ -221,11 +229,51 @@ fun MapScreen(
                             CameraUpdateFactory.newLatLngZoom(poi.location, 16f)
                         )
                         showBottomSheet = false
+                        selectedPoi = poi
+                        selectedPoiId = poi.id
                     }
                 },
                 onTryAnotherCategory = {
                     showBottomSheet = false
                     // La selección se hace con los chips
+                },
+                onMoreInfoClick = { poi ->
+                    scope.launch {
+                        showBottomSheet = false
+                        selectedPoi = poi
+                        selectedPoiId = poi.id
+                        isLoadingAsk = true
+                        showInfoBottomSheet = true
+
+                        val result = askRepository.ask(
+                            text = poi.name,
+                            locale = "es",
+                            poiId = poi.id
+                        )
+
+                        result.onSuccess { response ->
+                            askResponse = response
+                            isLoadingAsk = false
+                        }.onFailure { error ->
+                            Log.e("MapScreen", "Error fetching POI info: ${error.message}", error)
+                            snackbarHostState.showSnackbar("Error al obtener información. Inténtalo de nuevo.")
+                            isLoadingAsk = false
+                            showInfoBottomSheet = false
+                        }
+                    }
+                }
+            )
+        }
+
+        // Bottom Sheet de información del POI
+        if (showInfoBottomSheet && selectedPoi != null) {
+            POIInfoBottomSheet(
+                poi = selectedPoi!!,
+                askResponse = askResponse,
+                isLoading = isLoadingAsk,
+                onDismiss = {
+                    showInfoBottomSheet = false
+                    askResponse = null
                 }
             )
         }

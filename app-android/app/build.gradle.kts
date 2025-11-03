@@ -95,6 +95,9 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     implementation("com.jakewharton.retrofit:retrofit2-kotlinx-serialization-converter:1.0.0")
 
+    // Markdown for Compose
+    implementation("com.github.jeziellago:compose-markdown:0.5.4")
+
     // Core
     implementation("androidx.core:core-ktx:1.15.0")
 

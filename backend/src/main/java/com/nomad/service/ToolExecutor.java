@@ -9,6 +9,7 @@ import com.nomad.dto.realtime.ToolCall;
 import com.nomad.dto.realtime.ToolResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -21,6 +22,12 @@ public class ToolExecutor {
     private final PoiService poiService;
     private final AskService askService;
     private final ObjectMapper objectMapper;
+
+    @Value("${googleplaces.language-code}")
+    private String defaultLanguageCode;
+
+    @Value("${googleplaces.region-code}")
+    private String defaultRegionCode;
 
     public ToolExecutor(PoiService poiService, AskService askService, ObjectMapper objectMapper) {
         this.poiService = poiService;
@@ -58,16 +65,48 @@ public class ToolExecutor {
         double radius = arguments.get("radius").asDouble();
         String cat = arguments.has("cat") ? arguments.get("cat").asText() : null;
         int limit = arguments.has("limit") ? arguments.get("limit").asInt() : 25;
+        String locale = arguments.has("locale") ? arguments.get("locale").asText() : null;
+        String region = arguments.has("region") ? arguments.get("region").asText() : null;
 
-        log.info("Executing poi_nearby: lat={}, lng={}, radius={}, cat={}, limit={}", lat, lng, radius, cat, limit);
+        // Normalizar locale/region
+        String[] normalized = normalizeLocaleAndRegion(locale, region);
+        String languageCode = normalized[0];
+        String regionCode = normalized[1];
 
-        List<PoiResponse> pois = poiService.getNearbyPois(lat, lng, radius, cat, limit);
+        log.info("Executing poi_nearby: lat={}, lng={}, radius={}, cat={}, limit={}, lang={}, region={}",
+                lat, lng, radius, cat, limit, languageCode, regionCode);
+
+        List<PoiResponse> pois = poiService.getNearbyPois(lat, lng, radius, cat, limit, languageCode, regionCode);
 
         // Sanitize response - remove any internal details
         String jsonResult = objectMapper.writeValueAsString(pois);
 
         log.info("poi_nearby returned {} POIs", pois.size());
         return jsonResult;
+    }
+
+    private String[] normalizeLocaleAndRegion(String locale, String region) {
+        String languageCode = defaultLanguageCode;
+        String regionCode = defaultRegionCode;
+
+        if (locale != null && !locale.isBlank()) {
+            // Parse "es-ES" → lang="es", region="ES"
+            if (locale.contains("-")) {
+                String[] parts = locale.split("-");
+                languageCode = parts[0].toLowerCase();
+                if (region == null && parts.length > 1) {
+                    regionCode = parts[1].toUpperCase();
+                }
+            } else {
+                languageCode = locale.toLowerCase();
+            }
+        }
+
+        if (region != null && !region.isBlank()) {
+            regionCode = region.toUpperCase();
+        }
+
+        return new String[]{languageCode, regionCode};
     }
 
     private String executePoiContext(JsonNode arguments) throws Exception {
@@ -91,15 +130,8 @@ public class ToolExecutor {
         AskRequest request = new AskRequest(name, locale, poiId);
         AskResponse response = askService.aggregateInformation(request, lat, lng);
 
-        // Sanitize response - ensure no sensitive data is exposed
-        var sanitized = new AskResponse(
-            response.markdown(),
-            response.facts(),
-            response.sources(),
-            response.used_sources()
-        );
-
-        String jsonResult = objectMapper.writeValueAsString(sanitized);
+        // No need to sanitize - just use the response directly
+        String jsonResult = objectMapper.writeValueAsString(response);
 
         log.info("poi_context returned {} facts from {} sources",
             response.facts().size(), response.used_sources().size());

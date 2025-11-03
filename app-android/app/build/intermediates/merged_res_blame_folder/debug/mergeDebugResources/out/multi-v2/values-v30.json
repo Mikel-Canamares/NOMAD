@@ -1,7 +1,7 @@
 {
     "logs": [
         {
-            "outputFile": "com.nomad.app-mergeDebugResources-57:/values-v30/values-v30.xml",
+            "outputFile": "com.nomad.app-mergeDebugResources-64:/values-v30/values-v30.xml",
             "map": [
                 {
                     "source": "C:\\Users\\Mikel\\.gradle\\caches\\8.9\\transforms\\0e94486f99e7fd7ed6fb2483ee739423\\transformed\\material3-release\\res\\values-v30\\values-v30.xml",
