@@ -12,6 +12,7 @@ object RetrofitClient {
 
     // 10.0.2.2 es la IP del host desde el emulador Android
     private const val BASE_URL = "http://10.0.2.2:8081/api/"
+    //private const val BASE_URL = "http://192.168.0.16:8081/api/"
 
     private val json = Json {
         ignoreUnknownKeys = true

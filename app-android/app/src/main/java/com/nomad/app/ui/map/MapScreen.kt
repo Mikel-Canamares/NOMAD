@@ -50,6 +50,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun MapScreen(
     locationManager: LocationManager,
+    onNavigateToVoice: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var currentLocation by remember { mutableStateOf<Location?>(null) }
@@ -207,10 +208,7 @@ fun MapScreen(
         PushToTalkFab(
             voiceState = voiceState,
             onToggle = {
-                voiceState = when (voiceState) {
-                    VoiceState.INACTIVE -> VoiceState.LISTENING
-                    VoiceState.LISTENING -> VoiceState.INACTIVE
-                }
+                onNavigateToVoice()
             },
             modifier = Modifier
                 .align(Alignment.BottomCenter)

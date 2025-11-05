@@ -20,6 +20,9 @@ class MainActivity : ComponentActivity() {
 
         locationManager = LocationManager(this)
 
+        // Para probar WebRTC, descomentar la siguiente línea:
+        // com.nomad.app.webrtc.WebRTCTest.runBasicTest(this)
+
         enableEdgeToEdge()
         setContent {
             NomadTheme {

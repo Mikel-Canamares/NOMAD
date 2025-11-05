@@ -3,6 +3,7 @@ package com.nomad.app.data.api
 import com.nomad.app.data.dto.AskRequest
 import com.nomad.app.data.dto.AskResponse
 import com.nomad.app.data.dto.PoiDto
+import com.nomad.app.data.dto.RealtimeSessionResponse
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
@@ -23,4 +24,7 @@ interface NomadApiService {
     suspend fun ask(
         @Body request: AskRequest
     ): AskResponse
+
+    @POST("realtime/session")
+    suspend fun createRealtimeSession(): RealtimeSessionResponse
 }

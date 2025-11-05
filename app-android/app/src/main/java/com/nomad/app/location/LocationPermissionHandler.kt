@@ -113,7 +113,7 @@ fun rememberLocationPermissionState(
         }
     }
 
-    return remember {
+    return remember(permissionState) {
         LocationPermissionStateHolder(
             state = permissionState,
             launcher = launcher,

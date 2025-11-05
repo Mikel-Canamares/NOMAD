@@ -104,6 +104,9 @@ dependencies {
     // Coroutines for Play Services
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.9.0")
 
+    // WebRTC - Threema builds on Maven Central
+    implementation("ch.threema:webrtc-android:134.0.0")
+
     // Testing
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
