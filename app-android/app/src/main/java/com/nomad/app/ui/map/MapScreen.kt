@@ -38,6 +38,8 @@ import com.google.maps.android.compose.MapUiSettings
 import com.google.maps.android.compose.Marker
 import com.google.maps.android.compose.MarkerState
 import com.google.maps.android.compose.rememberCameraPositionState
+import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.nomad.app.data.dto.AskResponse
 import com.nomad.app.data.repository.AskRepository
 import com.nomad.app.data.repository.PoiRepository
@@ -45,16 +47,22 @@ import com.nomad.app.location.LocationManager
 import com.nomad.app.model.POI
 import com.nomad.app.model.POICategory
 import com.nomad.app.model.getAvailableCategories
+import com.nomad.app.permission.rememberAudioPermissionState
+import com.nomad.app.ui.voice.VoiceViewModel
 import kotlinx.coroutines.launch
 
 @Composable
 fun MapScreen(
     locationManager: LocationManager,
-    onNavigateToVoice: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    // ViewModel para asistente de voz integrado
+    val voiceViewModel: VoiceViewModel = viewModel()
+    val isVoiceActive by voiceViewModel.isActive.collectAsState()
+    val isPreparing by voiceViewModel.isPreparing.collectAsState()
+    val audioPermissionState = rememberAudioPermissionState()
+
     var currentLocation by remember { mutableStateOf<Location?>(null) }
-    var voiceState by remember { mutableStateOf(VoiceState.INACTIVE) }
     var showBottomSheet by remember { mutableStateOf(false) }
     var pois by remember { mutableStateOf<List<POI>>(emptyList()) }
     var selectedPoi by remember { mutableStateOf<POI?>(null) }
@@ -74,6 +82,20 @@ fun MapScreen(
     // Obtener ubicación actual
     LaunchedEffect(Unit) {
         currentLocation = locationManager.getCurrentLocation()
+    }
+
+    // Actualizar permiso de audio en el ViewModel
+    LaunchedEffect(audioPermissionState.isGranted) {
+        voiceViewModel.updateMicPermission(audioPermissionState.isGranted)
+    }
+
+    // Enviar contexto al asistente cuando esté activo
+    LaunchedEffect(isVoiceActive, currentLocation, pois, selectedPoi) {
+        if (isVoiceActive) {
+            // TODO: Enviar contexto de POIs y ubicación al asistente
+            // El asistente usará tool calls (poi_nearby, poi_context) para obtener información
+            Log.d("MapScreen", "Asistente de voz activo - POIs: ${pois.size}, Ubicación: ${currentLocation?.latitude}, ${currentLocation?.longitude}")
+        }
     }
 
     // Cargar POIs cercanos cuando cambia ubicación o categoría
@@ -204,11 +226,20 @@ fun MapScreen(
             }
         }
 
-        // FAB Push-to-Talk
-        PushToTalkFab(
-            voiceState = voiceState,
-            onToggle = {
-                onNavigateToVoice()
+        // FAB Asistente de Voz (integrado en el mapa)
+        VoiceAssistantFab(
+            isActive = isVoiceActive,
+            isPreparing = isPreparing,
+            onClick = {
+                if (!audioPermissionState.isGranted) {
+                    audioPermissionState.requestPermission()
+                } else {
+                    if (isVoiceActive) {
+                        voiceViewModel.stopVoiceAssistant()
+                    } else {
+                        voiceViewModel.startVoiceAssistant()
+                    }
+                }
             },
             modifier = Modifier
                 .align(Alignment.BottomCenter)

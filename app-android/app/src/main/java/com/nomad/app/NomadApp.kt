@@ -14,13 +14,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.rememberNavController
 import com.nomad.app.location.LocationManager
 import com.nomad.app.location.rememberLocationPermissionState
 import com.nomad.app.ui.map.MapScreen
-import com.nomad.app.ui.voice.VoiceScreen
 
 @Composable
 fun NomadApp(
@@ -28,31 +24,13 @@ fun NomadApp(
     modifier: Modifier = Modifier
 ) {
     val permissionState = rememberLocationPermissionState()
-    val navController = rememberNavController()
 
     if (permissionState.isGranted) {
-        // Navigation con mapa y pantalla de voz
-        NavHost(
-            navController = navController,
-            startDestination = "map",
+        // Mapa con asistente de voz integrado
+        MapScreen(
+            locationManager = locationManager,
             modifier = modifier
-        ) {
-            composable("map") {
-                MapScreen(
-                    locationManager = locationManager,
-                    onNavigateToVoice = {
-                        navController.navigate("voice")
-                    }
-                )
-            }
-            composable("voice") {
-                VoiceScreen(
-                    onNavigateBack = {
-                        navController.popBackStack()
-                    }
-                )
-            }
-        }
+        )
     } else {
         // Pantalla de solicitud de permisos
         Box(

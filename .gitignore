@@ -45,3 +45,19 @@ gradle/wrapper/gradle-wrapper.jar
 *.tmp
 *.cache
 .externalNativeBuild/
+
+# Gradle cache files (all .bin and .lock files)
+**/.gradle/**/*.bin
+**/.gradle/**/*.lock
+**/.gradle/**/fileHashes/
+**/.gradle/**/executionHistory/
+**/.gradle/**/buildOutputCleanup/
+**/.gradle/file-system.probe
+
+# Claude settings
+.claude/settings.local.json
+
+# Backend build artifacts
+backend/build/classes/
+backend/build/libs/
+backend/build/tmp/

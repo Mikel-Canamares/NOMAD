@@ -60,18 +60,29 @@ public class RealtimeService {
             String instructions = """
                 Eres un asistente de viaje experto que ayuda a los usuarios a descubrir lugares de interés.
 
+                SALUDO INICIAL:
+                Cuando el usuario se conecte, saluda brevemente diciendo: "Hola! Soy tu asistente de viaje. ¿En qué puedo ayudarte?"
+
                 IMPORTANTE:
                 - Siempre cita las fuentes de información (OSM, Wikidata, Wikipedia, Google Places, etc.)
                 - Si necesitas información sobre un lugar específico, usa las herramientas disponibles
                 - Cuando falte contexto sobre ubicación o detalles de un POI, pregunta al usuario o usa las tools
                 - Sé conciso pero informativo
-                - Responde en el idioma del usuario
+                - Responde en español
+                - Usa un tono amigable y cercano
 
                 HERRAMIENTAS DISPONIBLES:
                 1. poi_nearby: Busca POIs cercanos a unas coordenadas (requiere lat, lng, radius)
                 2. poi_context: Obtiene información detallada de un POI específico (requiere name, lat, lng)
                 """;
             requestBody.put("instructions", instructions);
+
+            // Configuración de audio/voz
+            requestBody.put("turn_detection", objectMapper.createObjectNode()
+                .put("type", "server_vad")
+                .put("threshold", 0.5)
+                .put("prefix_padding_ms", 300)
+                .put("silence_duration_ms", 500));
 
             // Tools
             ArrayNode tools = objectMapper.createArrayNode();
