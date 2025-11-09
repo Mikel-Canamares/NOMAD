@@ -57,6 +57,8 @@ class RealtimeVoiceManager(private val context: Context) {
     var onConnectionStateChange: ((PeerConnection.PeerConnectionState) -> Unit)? = null
     var onError: ((String) -> Unit)? = null
     var onIceConnectionChange: ((PeerConnection.IceConnectionState) -> Unit)? = null
+    var onAssistantStateChange: ((String) -> Unit)? = null // listening, thinking, speaking
+    var onTranscriptReceived: ((String, String) -> Unit)? = null // (role, text) - para debugging
 
     companion object {
         private const val TAG = "RealtimeVoiceManager"
@@ -122,6 +124,12 @@ class RealtimeVoiceManager(private val context: Context) {
                     isConnected = true
                     isConnecting = false
                     Log.d(TAG, "✓ Conexión WebRTC establecida con OpenAI Realtime API")
+
+                    // Solicitar saludo inicial del asistente
+                    coroutineScope?.launch {
+                        kotlinx.coroutines.delay(500) // Esperar a que el data channel esté listo
+                        requestGreeting()
+                    }
                 }
                 PeerConnection.PeerConnectionState.FAILED -> {
                     isConnecting = false
@@ -139,6 +147,16 @@ class RealtimeVoiceManager(private val context: Context) {
             Log.d(TAG, "Nuevo ICE candidate: ${candidate.sdpMid}")
             // Los ICE candidates se intercambian automáticamente con el flujo SDP
             // OpenAI Realtime API incluye los candidates en el SDP answer
+        }
+
+        // Callback para mensajes del data channel (eventos de OpenAI)
+        webRTCManager?.onDataChannelMessage = { message ->
+            processOpenAIEvent(message)
+        }
+
+        // Callback cuando el data channel se abre
+        webRTCManager?.onDataChannelOpen = {
+            Log.d(TAG, "✓ Data channel abierto - listo para enviar contexto")
         }
 
         // Crear PeerConnection
@@ -292,6 +310,177 @@ class RealtimeVoiceManager(private val context: Context) {
     fun triggerBargeIn() {
         webRTCManager?.sendBargeInSignal()
         Log.d(TAG, "Barge-in activado - interrumpiendo respuesta del asistente")
+    }
+
+    /**
+     * Solicita al asistente que salude al usuario
+     * Envía un evento response.create para generar el saludo inicial
+     */
+    fun requestGreeting() {
+        // Primero enviamos un mensaje de sistema para establecer el contexto
+        val contextEvent = """
+            {
+                "type": "conversation.item.create",
+                "item": {
+                    "type": "message",
+                    "role": "user",
+                    "content": [{
+                        "type": "input_text",
+                        "text": "Hola"
+                    }]
+                }
+            }
+        """.trimIndent()
+
+        webRTCManager?.sendTextMessage(contextEvent)
+
+        // Luego solicitamos la respuesta
+        coroutineScope?.launch {
+            kotlinx.coroutines.delay(100)
+            val greetingEvent = """
+                {
+                    "type": "response.create"
+                }
+            """.trimIndent()
+            webRTCManager?.sendTextMessage(greetingEvent)
+            Log.d(TAG, "Solicitud de saludo enviada al asistente")
+        }
+    }
+
+    /**
+     * Envía contexto inicial con ubicación del usuario y POIs cercanos
+     * Este contexto se envía como un mensaje de sistema que no requiere respuesta
+     */
+    fun sendInitialContext(
+        userLat: Double,
+        userLng: Double,
+        pois: List<Map<String, Any>>,
+        selectedCategory: String? = null
+    ) {
+        val poisSummary = pois.take(10).joinToString(", ") { poi ->
+            poi["name"] as? String ?: "POI"
+        }
+
+        val contextMessage = buildString {
+            append("Contexto de ubicación: El usuario está en las coordenadas $userLat, $userLng. ")
+            if (selectedCategory != null) {
+                append("Está viendo la categoría: $selectedCategory. ")
+            }
+            if (pois.isNotEmpty()) {
+                append("Hay ${pois.size} POIs cercanos: $poisSummary.")
+            }
+        }
+
+        // Usar session.update para actualizar el contexto sin generar respuesta
+        val sessionUpdateEvent = """
+            {
+                "type": "session.update",
+                "session": {
+                    "instructions": "Eres un asistente de viaje. El usuario está en ubicación ($userLat, $userLng). ${if (selectedCategory != null) "Categoría activa: $selectedCategory. " else ""}${if (pois.isNotEmpty()) "POIs cercanos: $poisSummary. " else ""}Responde de forma concisa y natural a sus preguntas sobre estos lugares."
+                }
+            }
+        """.trimIndent()
+
+        webRTCManager?.sendTextMessage(sessionUpdateEvent)
+        Log.d(TAG, "Contexto inicial actualizado via session.update")
+    }
+
+    /**
+     * Procesa eventos recibidos del servidor OpenAI via data channel
+     * Estos eventos indican cambios de estado del asistente
+     */
+    private fun processOpenAIEvent(eventJson: String) {
+        try {
+            Log.d(TAG, "📨 Evento recibido: ${eventJson.take(200)}")
+
+            // Parsear el JSON del evento
+            val jsonObject = org.json.JSONObject(eventJson)
+            val eventType = jsonObject.optString("type", "")
+
+            when (eventType) {
+                // El servidor ha detectado que el usuario está hablando
+                "input_audio_buffer.speech_started" -> {
+                    Log.d(TAG, "🎤 Usuario comenzó a hablar")
+                    onAssistantStateChange?.invoke("listening")
+                }
+
+                // El usuario dejó de hablar, procesando entrada
+                "input_audio_buffer.speech_stopped" -> {
+                    Log.d(TAG, "🤔 Usuario dejó de hablar - procesando")
+                    onAssistantStateChange?.invoke("thinking")
+                }
+
+                // El usuario terminó de hablar y se confirmó el input
+                "input_audio_buffer.committed" -> {
+                    Log.d(TAG, "✓ Audio del usuario confirmado")
+                }
+
+                // El asistente está generando una respuesta
+                "response.created" -> {
+                    Log.d(TAG, "💭 Asistente generando respuesta")
+                    onAssistantStateChange?.invoke("thinking")
+                }
+
+                // El asistente comenzó a generar audio de respuesta
+                "response.audio.delta" -> {
+                    // Primer delta de audio = asistente está hablando
+                    onAssistantStateChange?.invoke("speaking")
+                }
+
+                // El asistente comenzó a hablar
+                "response.audio_transcript.delta" -> {
+                    Log.d(TAG, "🗣️ Asistente hablando")
+                    onAssistantStateChange?.invoke("speaking")
+                }
+
+                // La respuesta del asistente ha terminado
+                "response.done" -> {
+                    Log.d(TAG, "✓ Respuesta completada - listo para escuchar")
+                    onAssistantStateChange?.invoke("listening")
+                }
+
+                // Transcripción del usuario (útil para debugging)
+                "conversation.item.input_audio_transcription.completed" -> {
+                    val transcript = jsonObject.optJSONObject("transcript")?.optString("text", "")
+                    if (!transcript.isNullOrEmpty()) {
+                        Log.d(TAG, "📝 Usuario dijo: $transcript")
+                        onTranscriptReceived?.invoke("user", transcript)
+                    }
+                }
+
+                // Transcripción del asistente (útil para debugging)
+                "response.audio_transcript.done" -> {
+                    val transcript = jsonObject.optString("transcript", "")
+                    if (transcript.isNotEmpty()) {
+                        Log.d(TAG, "📝 Asistente dijo: $transcript")
+                        onTranscriptReceived?.invoke("assistant", transcript)
+                    }
+                }
+
+                // Error del servidor
+                "error" -> {
+                    val error = jsonObject.optJSONObject("error")
+                    val errorMessage = error?.optString("message", "Error desconocido") ?: "Error desconocido"
+                    Log.e(TAG, "❌ Error del servidor: $errorMessage")
+                    onError?.invoke("Error: $errorMessage")
+                }
+
+                // Evento de sesión actualizada (confirmación de configuración)
+                "session.updated" -> {
+                    Log.d(TAG, "✓ Sesión actualizada correctamente")
+                }
+
+                // Otros eventos (logging para debugging)
+                else -> {
+                    if (eventType.isNotEmpty()) {
+                        Log.d(TAG, "ℹ️ Evento no manejado: $eventType")
+                    }
+                }
+            }
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Error procesando evento de OpenAI: ${e.message}", e)
+        }
     }
 
     /**

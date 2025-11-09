@@ -63,11 +63,17 @@ public class RealtimeService {
                 SALUDO INICIAL:
                 Cuando el usuario se conecte, saluda brevemente diciendo: "Hola! Soy tu asistente de viaje. ¿En qué puedo ayudarte?"
 
+                CONVERSACIÓN NATURAL:
+                - Mantén una conversación fluida y natural
+                - Responde a múltiples preguntas seguidas sin repetir el saludo
+                - Recuerda el contexto de preguntas anteriores en la misma sesión
+                - Si el usuario interrumpe, responde a su nueva pregunta directamente
+
                 IMPORTANTE:
                 - Siempre cita las fuentes de información (OSM, Wikidata, Wikipedia, Google Places, etc.)
                 - Si necesitas información sobre un lugar específico, usa las herramientas disponibles
                 - Cuando falte contexto sobre ubicación o detalles de un POI, pregunta al usuario o usa las tools
-                - Sé conciso pero informativo
+                - Sé conciso pero informativo (máximo 2-3 frases por respuesta)
                 - Responde en español
                 - Usa un tono amigable y cercano
 
@@ -77,12 +83,21 @@ public class RealtimeService {
                 """;
             requestBody.put("instructions", instructions);
 
-            // Configuración de audio/voz
+            // Habilitar transcripciones de entrada de audio
+            requestBody.put("input_audio_transcription", objectMapper.createObjectNode()
+                .put("model", "whisper-1"));
+
+            // Configuración de audio/voz con server VAD
+            // threshold: 0.5 (0.0-1.0) - sensibilidad para detectar voz
+            // prefix_padding_ms: audio a incluir antes del inicio de voz
+            // silence_duration_ms: duración de silencio para considerar que terminó de hablar
+            // create_response: true = genera respuesta automáticamente al terminar de hablar
             requestBody.put("turn_detection", objectMapper.createObjectNode()
                 .put("type", "server_vad")
                 .put("threshold", 0.5)
                 .put("prefix_padding_ms", 300)
-                .put("silence_duration_ms", 500));
+                .put("silence_duration_ms", 700)
+                .put("create_response", true));
 
             // Tools
             ArrayNode tools = objectMapper.createArrayNode();

@@ -60,6 +60,7 @@ fun MapScreen(
     val voiceViewModel: VoiceViewModel = viewModel()
     val isVoiceActive by voiceViewModel.isActive.collectAsState()
     val isPreparing by voiceViewModel.isPreparing.collectAsState()
+    val assistantState by voiceViewModel.assistantState.collectAsState()
     val audioPermissionState = rememberAudioPermissionState()
 
     var currentLocation by remember { mutableStateOf<Location?>(null) }
@@ -89,12 +90,31 @@ fun MapScreen(
         voiceViewModel.updateMicPermission(audioPermissionState.isGranted)
     }
 
-    // Enviar contexto al asistente cuando esté activo
-    LaunchedEffect(isVoiceActive, currentLocation, pois, selectedPoi) {
-        if (isVoiceActive) {
-            // TODO: Enviar contexto de POIs y ubicación al asistente
-            // El asistente usará tool calls (poi_nearby, poi_context) para obtener información
-            Log.d("MapScreen", "Asistente de voz activo - POIs: ${pois.size}, Ubicación: ${currentLocation?.latitude}, ${currentLocation?.longitude}")
+    // Enviar contexto inicial al asistente cuando se conecte
+    LaunchedEffect(isVoiceActive) {
+        if (isVoiceActive && currentLocation != null) {
+            // Esperar un poco para que el data channel esté listo
+            kotlinx.coroutines.delay(1000)
+
+            // Preparar lista de POIs como mapas
+            val poisData = pois.map { poi ->
+                mapOf<String, Any>(
+                    "name" to poi.name,
+                    "category" to (poi.category ?: "unknown"),
+                    "lat" to poi.location.latitude,
+                    "lng" to poi.location.longitude
+                )
+            }
+
+            // Enviar contexto inicial
+            voiceViewModel.sendInitialContext(
+                userLat = currentLocation!!.latitude,
+                userLng = currentLocation!!.longitude,
+                pois = poisData,
+                selectedCategory = selectedCategory?.displayName
+            )
+
+            Log.d("MapScreen", "Contexto inicial enviado al asistente - POIs: ${pois.size}, Ubicación: ${currentLocation?.latitude}, ${currentLocation?.longitude}, Categoría: ${selectedCategory?.displayName}")
         }
     }
 
@@ -223,6 +243,32 @@ fun MapScreen(
                         }
                     )
                 }
+            }
+        }
+
+        // Mensaje de estado del asistente
+        if (isVoiceActive || isPreparing) {
+            val statusText = when {
+                isPreparing -> "Conectando..."
+                assistantState == VoiceViewModel.AssistantState.CONNECTING -> "Conectando..."
+                assistantState == VoiceViewModel.AssistantState.LISTENING -> "Escuchando..."
+                assistantState == VoiceViewModel.AssistantState.THINKING -> "Pensando..."
+                assistantState == VoiceViewModel.AssistantState.SPEAKING -> "Respondiendo..."
+                else -> "Activo"
+            }
+
+            androidx.compose.material3.Surface(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 104.dp),
+                color = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant,
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp)
+            ) {
+                Text(
+                    text = statusText,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    style = androidx.compose.material3.MaterialTheme.typography.bodyMedium
+                )
             }
         }
 

@@ -31,6 +31,18 @@ class VoiceViewModel(application: Application) : AndroidViewModel(application) {
     private val _connectionState = MutableStateFlow<PeerConnection.PeerConnectionState?>(null)
     val connectionState: StateFlow<PeerConnection.PeerConnectionState?> = _connectionState.asStateFlow()
 
+    // Estados del asistente para feedback visual
+    private val _assistantState = MutableStateFlow<AssistantState>(AssistantState.IDLE)
+    val assistantState: StateFlow<AssistantState> = _assistantState.asStateFlow()
+
+    enum class AssistantState {
+        IDLE,           // Inactivo
+        CONNECTING,     // Conectando
+        LISTENING,      // Escuchando al usuario
+        THINKING,       // Procesando/pensando
+        SPEAKING        // Hablando/respondiendo
+    }
+
     /**
      * Actualiza el estado del permiso del micrófono
      */
@@ -56,6 +68,7 @@ class VoiceViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         _isPreparing.value = true
+        _assistantState.value = AssistantState.CONNECTING
         _lastError.value = null
 
         // Crear RealtimeVoiceManager si no existe
@@ -68,15 +81,18 @@ class VoiceViewModel(application: Application) : AndroidViewModel(application) {
                         PeerConnection.PeerConnectionState.CONNECTED -> {
                             _isActive.value = true
                             _isPreparing.value = false
+                            _assistantState.value = AssistantState.LISTENING
                         }
                         PeerConnection.PeerConnectionState.FAILED -> {
                             _isActive.value = false
                             _isPreparing.value = false
+                            _assistantState.value = AssistantState.IDLE
                             _lastError.value = "Conexión fallida"
                         }
                         PeerConnection.PeerConnectionState.DISCONNECTED -> {
                             _isActive.value = false
                             _isPreparing.value = false
+                            _assistantState.value = AssistantState.IDLE
                         }
                         else -> {}
                     }
@@ -86,6 +102,17 @@ class VoiceViewModel(application: Application) : AndroidViewModel(application) {
                     _lastError.value = error
                     _isPreparing.value = false
                     _isActive.value = false
+                    _assistantState.value = AssistantState.IDLE
+                }
+
+                // Callback para estados del asistente (listening, thinking, speaking)
+                onAssistantStateChange = { state ->
+                    _assistantState.value = when (state) {
+                        "listening" -> AssistantState.LISTENING
+                        "thinking" -> AssistantState.THINKING
+                        "speaking" -> AssistantState.SPEAKING
+                        else -> AssistantState.LISTENING
+                    }
                 }
             }
         }
@@ -102,6 +129,7 @@ class VoiceViewModel(application: Application) : AndroidViewModel(application) {
         voiceManager = null
         _isActive.value = false
         _isPreparing.value = false
+        _assistantState.value = AssistantState.IDLE
         _connectionState.value = null
     }
 
@@ -120,6 +148,25 @@ class VoiceViewModel(application: Application) : AndroidViewModel(application) {
      */
     fun sendPoiContext(poiId: String, lat: Double, lng: Double, name: String) {
         voiceManager?.sendPoiContext(poiId, lat, lng, name)
+    }
+
+    /**
+     * Envía contexto inicial con ubicación y POIs cercanos
+     */
+    fun sendInitialContext(
+        userLat: Double,
+        userLng: Double,
+        pois: List<Map<String, Any>>,
+        selectedCategory: String? = null
+    ) {
+        voiceManager?.sendInitialContext(userLat, userLng, pois, selectedCategory)
+    }
+
+    /**
+     * Solicita al asistente que salude al usuario
+     */
+    fun requestGreeting() {
+        voiceManager?.requestGreeting()
     }
 
     /**
