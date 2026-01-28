@@ -4,7 +4,7 @@
 # Etapa 1: Build
 FROM eclipse-temurin:21-jdk-alpine AS builder
 
-WORKDIR /build
+WORKDIR /app
 
 # Copiar archivos de configuración de Gradle
 COPY backend/gradle ./gradle
@@ -21,8 +21,10 @@ RUN ./gradlew dependencies --no-daemon || true
 # Copiar código fuente
 COPY backend/src ./src
 
-# Compilar aplicación
-RUN ./gradlew bootJar --no-daemon
+# Compilar aplicación y verificar salida
+RUN ./gradlew bootJar --no-daemon && \
+    echo "=== JAR generado ===" && \
+    ls -lah build/libs/
 
 # Etapa 2: Runtime
 FROM eclipse-temurin:21-jre-alpine
@@ -33,7 +35,7 @@ WORKDIR /opt/app
 RUN addgroup --system javauser && adduser -S -s /bin/false -G javauser javauser
 
 # Copiar JAR desde etapa de build
-COPY --from=builder --chown=javauser:javauser /build/build/libs/*.jar app.jar
+COPY --from=builder --chown=javauser:javauser /app/build/libs/*.jar app.jar
 
 # Cambiar a usuario no-root
 USER javauser
