@@ -3,18 +3,18 @@ package com.nomad.app.ui.voice
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.nomad.app.voice.RealtimeVoiceManager
+import com.nomad.app.voice.HybridVoiceManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import org.webrtc.PeerConnection
 
 /**
- * ViewModel para el asistente de voz con OpenAI Realtime API
+ * ViewModel para el asistente de voz híbrido
+ * Usa Android STT + GPT-4 + Android TTS (97% más barato que Realtime API)
  */
 class VoiceViewModel(application: Application) : AndroidViewModel(application) {
 
-    private var voiceManager: RealtimeVoiceManager? = null
+    private var voiceManager: HybridVoiceManager? = null
 
     private val _hasMicPermission = MutableStateFlow(false)
     val hasMicPermission: StateFlow<Boolean> = _hasMicPermission.asStateFlow()
@@ -28,19 +28,23 @@ class VoiceViewModel(application: Application) : AndroidViewModel(application) {
     private val _lastError = MutableStateFlow<String?>(null)
     val lastError: StateFlow<String?> = _lastError.asStateFlow()
 
-    private val _connectionState = MutableStateFlow<PeerConnection.PeerConnectionState?>(null)
-    val connectionState: StateFlow<PeerConnection.PeerConnectionState?> = _connectionState.asStateFlow()
-
     // Estados del asistente para feedback visual
     private val _assistantState = MutableStateFlow<AssistantState>(AssistantState.IDLE)
     val assistantState: StateFlow<AssistantState> = _assistantState.asStateFlow()
 
+    // Transcripciones (para debugging y feedback)
+    private val _userTranscript = MutableStateFlow<String>("")
+    val userTranscript: StateFlow<String> = _userTranscript.asStateFlow()
+
+    private val _assistantTranscript = MutableStateFlow<String>("")
+    val assistantTranscript: StateFlow<String> = _assistantTranscript.asStateFlow()
+
     enum class AssistantState {
         IDLE,           // Inactivo
-        CONNECTING,     // Conectando
+        INITIALIZING,   // Inicializando
         LISTENING,      // Escuchando al usuario
-        THINKING,       // Procesando/pensando
-        SPEAKING        // Hablando/respondiendo
+        PROCESSING,     // Procesando con GPT-4
+        SPEAKING        // Hablando (TTS)
     }
 
     /**
@@ -55,7 +59,7 @@ class VoiceViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * Inicia el asistente de voz con OpenAI Realtime API
+     * Inicia el asistente de voz híbrido
      */
     fun startVoiceAssistant() {
         if (!_hasMicPermission.value) {
@@ -68,120 +72,128 @@ class VoiceViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         _isPreparing.value = true
-        _assistantState.value = AssistantState.CONNECTING
+        _assistantState.value = AssistantState.INITIALIZING
         _lastError.value = null
 
-        // Crear RealtimeVoiceManager si no existe
+        // Crear HybridVoiceManager si no existe
         if (voiceManager == null) {
-            voiceManager = RealtimeVoiceManager(getApplication()).apply {
-                // Configurar listeners
-                onConnectionStateChange = { state ->
-                    _connectionState.value = state
-                    when (state) {
-                        PeerConnection.PeerConnectionState.CONNECTED -> {
-                            _isActive.value = true
-                            _isPreparing.value = false
-                            _assistantState.value = AssistantState.LISTENING
-                        }
-                        PeerConnection.PeerConnectionState.FAILED -> {
-                            _isActive.value = false
-                            _isPreparing.value = false
-                            _assistantState.value = AssistantState.IDLE
-                            _lastError.value = "Conexión fallida"
-                        }
-                        PeerConnection.PeerConnectionState.DISCONNECTED -> {
-                            _isActive.value = false
-                            _isPreparing.value = false
-                            _assistantState.value = AssistantState.IDLE
-                        }
-                        else -> {}
+            voiceManager = HybridVoiceManager(getApplication()).apply {
+                // Configurar callbacks de estado
+                onStateChange = { state ->
+                    _assistantState.value = when (state) {
+                        HybridVoiceManager.VoiceState.IDLE -> AssistantState.IDLE
+                        HybridVoiceManager.VoiceState.INITIALIZING -> AssistantState.INITIALIZING
+                        HybridVoiceManager.VoiceState.LISTENING -> AssistantState.LISTENING
+                        HybridVoiceManager.VoiceState.PROCESSING -> AssistantState.PROCESSING
+                        HybridVoiceManager.VoiceState.SPEAKING -> AssistantState.SPEAKING
                     }
                 }
 
                 onError = { error ->
                     _lastError.value = error
-                    _isPreparing.value = false
-                    _isActive.value = false
-                    _assistantState.value = AssistantState.IDLE
                 }
 
-                // Callback para estados del asistente (listening, thinking, speaking)
-                onAssistantStateChange = { state ->
-                    _assistantState.value = when (state) {
-                        "listening" -> AssistantState.LISTENING
-                        "thinking" -> AssistantState.THINKING
-                        "speaking" -> AssistantState.SPEAKING
-                        else -> AssistantState.LISTENING
-                    }
+                onUserSpeech = { text ->
+                    _userTranscript.value = text
+                }
+
+                onAssistantResponse = { text ->
+                    _assistantTranscript.value = text
+                }
+
+                // Inicializar
+                initialize {
+                    _isPreparing.value = false
+                    _isActive.value = true
+
+                    // Iniciar sesión
+                    startSession(viewModelScope)
                 }
             }
+        } else {
+            // Ya existe, solo iniciar sesión
+            _isPreparing.value = false
+            _isActive.value = true
+            voiceManager?.startSession(viewModelScope)
         }
-
-        // Iniciar sesión
-        voiceManager?.startSession(viewModelScope)
     }
 
     /**
      * Detiene el asistente de voz
      */
     fun stopVoiceAssistant() {
-        voiceManager?.endSession()
-        voiceManager = null
+        voiceManager?.stopSession()
         _isActive.value = false
         _isPreparing.value = false
         _assistantState.value = AssistantState.IDLE
-        _connectionState.value = null
     }
 
     /**
-     * Habilita/deshabilita el micrófono durante la llamada
+     * Actualiza el contexto de ubicación y POIs
      */
-    fun toggleMicrophone() {
-        voiceManager?.let { manager ->
-            val currentState = manager.isMicrophoneEnabled()
-            manager.setMicrophoneEnabled(!currentState)
+    fun updateContext(
+        userLat: Double?,
+        userLng: Double?,
+        selectedCategory: String? = null,
+        pois: List<Map<String, Any>>? = null
+    ) {
+        voiceManager?.updateContext(userLat, userLng, selectedCategory, pois)
+    }
+
+    /**
+     * Habla sobre un tema específico (para usar desde POI detail)
+     * @param topic Tema sobre el que hablar (ej: "Cuéntame sobre el Museo del Prado")
+     */
+    fun speakAbout(topic: String) {
+        if (!_hasMicPermission.value) {
+            _lastError.value = "No hay permiso de micrófono"
+            return
+        }
+
+        // Si no está inicializado, inicializar primero
+        if (voiceManager == null) {
+            _isPreparing.value = true
+            _assistantState.value = AssistantState.INITIALIZING
+
+            voiceManager = HybridVoiceManager(getApplication()).apply {
+                onStateChange = { state ->
+                    _assistantState.value = when (state) {
+                        HybridVoiceManager.VoiceState.IDLE -> AssistantState.IDLE
+                        HybridVoiceManager.VoiceState.INITIALIZING -> AssistantState.INITIALIZING
+                        HybridVoiceManager.VoiceState.LISTENING -> AssistantState.LISTENING
+                        HybridVoiceManager.VoiceState.PROCESSING -> AssistantState.PROCESSING
+                        HybridVoiceManager.VoiceState.SPEAKING -> AssistantState.SPEAKING
+                    }
+                }
+
+                onError = { error ->
+                    _lastError.value = error
+                }
+
+                onUserSpeech = { text ->
+                    _userTranscript.value = text
+                }
+
+                onAssistantResponse = { text ->
+                    _assistantTranscript.value = text
+                }
+
+                initialize {
+                    _isPreparing.value = false
+                    speakAbout(topic, viewModelScope)
+                }
+            }
+        } else {
+            // Ya inicializado, hablar directamente
+            voiceManager?.speakAbout(topic, viewModelScope)
         }
     }
 
     /**
-     * Envía contexto de POI al asistente
+     * Detiene la síntesis actual (útil cuando se toca un POI)
      */
-    fun sendPoiContext(poiId: String, lat: Double, lng: Double, name: String) {
-        voiceManager?.sendPoiContext(poiId, lat, lng, name)
-    }
-
-    /**
-     * Envía contexto inicial con ubicación y POIs cercanos
-     */
-    fun sendInitialContext(
-        userLat: Double,
-        userLng: Double,
-        pois: List<Map<String, Any>>,
-        selectedCategory: String? = null
-    ) {
-        voiceManager?.sendInitialContext(userLat, userLng, pois, selectedCategory)
-    }
-
-    /**
-     * Solicita al asistente que salude al usuario
-     */
-    fun requestGreeting() {
-        voiceManager?.requestGreeting()
-    }
-
-    /**
-     * Envía mensaje de texto al asistente
-     */
-    fun sendTextMessage(message: String) {
-        voiceManager?.sendTextMessage(message)
-    }
-
-    /**
-     * Activa barge-in para interrumpir al asistente
-     * Se llama automáticamente cuando se detecta que el usuario habla
-     */
-    fun triggerBargeIn() {
-        voiceManager?.triggerBargeIn()
+    fun stopSpeaking() {
+        voiceManager?.stopSpeaking()
     }
 
     /**
@@ -191,8 +203,16 @@ class VoiceViewModel(application: Application) : AndroidViewModel(application) {
         _lastError.value = null
     }
 
+    /**
+     * Verifica si está hablando
+     */
+    fun isSpeaking(): Boolean {
+        return voiceManager?.isSpeaking() ?: false
+    }
+
     override fun onCleared() {
         super.onCleared()
-        stopVoiceAssistant()
+        voiceManager?.shutdown()
+        voiceManager = null
     }
 }
