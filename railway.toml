@@ -1,0 +1,14 @@
+# ==========================================
+# Railway Configuration - NOMAD Backend
+# ==========================================
+# Configuración para forzar uso de Dockerfile en lugar de Railpack
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10
+healthcheckPath = "/api/actuator/health"
+healthcheckTimeout = 100
