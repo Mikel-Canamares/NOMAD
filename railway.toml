@@ -10,3 +10,9 @@ healthcheckPath = "/api/actuator/health"
 healthcheckTimeout = 300
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 10
+
+# Variables de entorno necesarias (configúralas en Railway Variables tab)
+[env]
+# SPRING_PROFILES_ACTIVE = "production"
+# OPENAI_API_KEY = "tu-clave-aqui"
+# GOOGLE_PLACES_API_KEY = "tu-clave-aqui"
