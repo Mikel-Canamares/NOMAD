@@ -106,12 +106,12 @@ fun MapScreen(
                 )
             }
 
-            // Enviar contexto inicial
-            voiceViewModel.sendInitialContext(
+            // Actualizar contexto
+            voiceViewModel.updateContext(
                 userLat = currentLocation!!.latitude,
                 userLng = currentLocation!!.longitude,
-                pois = poisData,
-                selectedCategory = selectedCategory?.displayName
+                selectedCategory = selectedCategory?.displayName,
+                pois = poisData
             )
 
             Log.d("MapScreen", "Contexto inicial enviado al asistente - POIs: ${pois.size}, Ubicación: ${currentLocation?.latitude}, ${currentLocation?.longitude}, Categoría: ${selectedCategory?.displayName}")
@@ -249,10 +249,10 @@ fun MapScreen(
         // Mensaje de estado del asistente
         if (isVoiceActive || isPreparing) {
             val statusText = when {
-                isPreparing -> "Conectando..."
-                assistantState == VoiceViewModel.AssistantState.CONNECTING -> "Conectando..."
+                isPreparing -> "Inicializando..."
+                assistantState == VoiceViewModel.AssistantState.INITIALIZING -> "Inicializando..."
                 assistantState == VoiceViewModel.AssistantState.LISTENING -> "Escuchando..."
-                assistantState == VoiceViewModel.AssistantState.THINKING -> "Pensando..."
+                assistantState == VoiceViewModel.AssistantState.PROCESSING -> "Procesando..."
                 assistantState == VoiceViewModel.AssistantState.SPEAKING -> "Respondiendo..."
                 else -> "Activo"
             }

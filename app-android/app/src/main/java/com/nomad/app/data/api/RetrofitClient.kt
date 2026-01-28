@@ -37,4 +37,5 @@ object RetrofitClient {
         .build()
 
     val apiService: NomadApiService = retrofit.create(NomadApiService::class.java)
+    val voiceChatApiService: VoiceChatApiService = retrofit.create(VoiceChatApiService::class.java)
 }
