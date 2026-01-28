@@ -9,8 +9,13 @@ spring:
       # Caché más agresiva en producción para reducir llamadas a APIs externas
       spec: maximumSize=5000,expireAfterWrite=24h
 
+  # Graceful shutdown para Railway
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+
 server:
   port: ${PORT:8080}  # Railway proporciona PORT como variable de entorno
+  shutdown: graceful  # Permite que las requests en curso se completen antes de apagar
   tomcat:
     connection-timeout: 30s
     threads:
@@ -43,6 +48,12 @@ management:
       probes:
         enabled: true
     metrics:
+      enabled: true
+  # Habilitar liveness y readiness probes para Railway
+  health:
+    livenessState:
+      enabled: true
+    readinessState:
       enabled: true
   metrics:
     export:
