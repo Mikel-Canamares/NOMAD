@@ -1,22 +1,22 @@
+# Dockerfile para Railway - En la raíz del proyecto
+# Construye el backend que está en ./backend/
+
 # Etapa 1: Build
 FROM eclipse-temurin:21-jdk-alpine AS builder
 
 WORKDIR /app
 
-# Copiar archivos de configuración de Gradle
-COPY gradle ./gradle
-COPY gradlew .
-COPY settings.gradle .
-COPY build.gradle .
+# Copiar archivos de configuración de Gradle desde backend/
+COPY backend/gradle ./gradle
+COPY backend/gradlew .
+COPY backend/settings.gradle .
+COPY backend/build.gradle .
 
-# Hacer ejecutable gradlew
-RUN chmod +x gradlew
-
-# Descargar dependencias (capa cacheada)
-RUN ./gradlew dependencies --no-daemon || true
+# Hacer ejecutable gradlew y descargar dependencias
+RUN chmod +x gradlew && ./gradlew dependencies --no-daemon || true
 
 # Copiar código fuente
-COPY src ./src
+COPY backend/src ./src
 
 # Compilar aplicación
 RUN ./gradlew bootJar --no-daemon
