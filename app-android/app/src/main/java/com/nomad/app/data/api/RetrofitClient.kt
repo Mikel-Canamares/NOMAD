@@ -1,6 +1,7 @@
 package com.nomad.app.data.api
 
 import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
+import com.nomad.app.BuildConfig
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -8,11 +9,11 @@ import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import java.util.concurrent.TimeUnit
 
-object RetrofitClient {
-
-    // 10.0.2.2 es la IP del host desde el emulador Android
-    private const val BASE_URL = "http://10.0.2.2:8081/api/"
-    //private const val BASE_URL = "http://192.168.0.16:8081/api/"
+/**
+ * Cliente Retrofit con URL configurable dinámicamente.
+ * Usa BuildConfig para URLs por defecto según build type (debug/release).
+ */
+class RetrofitClient(baseUrl: String = BuildConfig.DEFAULT_BACKEND_URL) {
 
     private val json = Json {
         ignoreUnknownKeys = true
@@ -20,7 +21,11 @@ object RetrofitClient {
     }
 
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
-        level = HttpLoggingInterceptor.Level.BODY
+        level = if (BuildConfig.DEBUG) {
+            HttpLoggingInterceptor.Level.BODY
+        } else {
+            HttpLoggingInterceptor.Level.BASIC
+        }
     }
 
     private val okHttpClient = OkHttpClient.Builder()
@@ -31,11 +36,29 @@ object RetrofitClient {
         .build()
 
     private val retrofit = Retrofit.Builder()
-        .baseUrl(BASE_URL)
+        .baseUrl(baseUrl)
         .client(okHttpClient)
         .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
         .build()
 
     val apiService: NomadApiService = retrofit.create(NomadApiService::class.java)
     val voiceChatApiService: VoiceChatApiService = retrofit.create(VoiceChatApiService::class.java)
+
+    companion object {
+        // Instancia singleton con URL por defecto
+        @Volatile
+        private var instance: RetrofitClient? = null
+
+        fun getInstance(baseUrl: String? = null): RetrofitClient {
+            return if (baseUrl != null) {
+                // Crear nueva instancia con URL personalizada
+                RetrofitClient(baseUrl)
+            } else {
+                // Usar instancia singleton con URL por defecto
+                instance ?: synchronized(this) {
+                    instance ?: RetrofitClient().also { instance = it }
+                }
+            }
+        }
+    }
 }

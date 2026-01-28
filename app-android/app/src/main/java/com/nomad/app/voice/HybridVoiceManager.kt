@@ -20,11 +20,14 @@ import kotlinx.coroutines.withContext
  * - Realtime API: ~$18/hora
  * - Sistema híbrido: ~$0.50/hora
  */
-class HybridVoiceManager(private val context: Context) {
+class HybridVoiceManager(
+    private val context: Context,
+    backendUrl: String? = null
+) {
 
     private val ttsManager = AndroidTTSManager(context)
     private val sttManager = AndroidSTTManager(context)
-    private val apiService = RetrofitClient.voiceChatApiService
+    private val apiService = RetrofitClient.getInstance(backendUrl).voiceChatApiService
 
     private val conversationHistory = mutableListOf<ConversationMessage>()
     private var isActive = false
@@ -291,6 +294,20 @@ class HybridVoiceManager(private val context: Context) {
         if (isActive) {
             sttManager.startListening(continuous = true)
         }
+    }
+
+    /**
+     * Actualiza la velocidad de TTS
+     */
+    fun updateTtsSpeed(speed: Float) {
+        ttsManager.setSpeechRate(speed)
+    }
+
+    /**
+     * Actualiza el pitch de TTS
+     */
+    fun updateTtsPitch(pitch: Float) {
+        ttsManager.setPitch(pitch)
     }
 
     /**

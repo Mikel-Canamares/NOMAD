@@ -1,0 +1,93 @@
+spring:
+  application:
+    name: nomad-backend
+
+  cache:
+    type: caffeine
+    cache-names: poiCache, askCache, placeDetailsCache
+    caffeine:
+      # Caché más agresiva en producción para reducir llamadas a APIs externas
+      spec: maximumSize=5000,expireAfterWrite=24h
+
+server:
+  port: ${PORT:8080}  # Railway proporciona PORT como variable de entorno
+  tomcat:
+    connection-timeout: 30s
+    threads:
+      max: 50  # Reducido para Railway free tier
+      min-spare: 5
+  servlet:
+    context-path: /api
+  # Configuración de compresión para reducir ancho de banda
+  compression:
+    enabled: true
+    mime-types: application/json,application/xml,text/html,text/xml,text/plain
+    min-response-size: 1024
+
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true  # Mantener habilitado para testing, deshabilitar si preocupa seguridad
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+    metrics:
+      enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+    tags:
+      application: ${spring.application.name}
+      environment: production
+
+logging:
+  level:
+    root: INFO
+    com.nomad: INFO
+    com.nomad.service.OverpassService: WARN
+    com.nomad.service.GooglePlacesService: INFO
+    com.nomad.service.AskService: INFO
+    com.nomad.service.VoiceChatService: INFO
+    org.springframework.web: WARN
+    org.springframework.cache: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+
+# POI Source Configuration
+nearby:
+  source: google_places  # Usar solo Google Places en producción por calidad
+
+# Aggregator Configuration (disable legacy sources for /ask)
+aggregator:
+  enable:
+    osm: false
+    wikidata: false
+    wikipedia: false
+    opentripmap: false
+    foursquare: false
+
+# API Keys - DEBEN configurarse como variables de entorno en Railway
+api:
+  openai:
+    key: ${OPENAI_API_KEY}
+  opentripmap:
+    key: ${OPENTRIPMAP_API_KEY:}
+  foursquare:
+    key: ${FOURSQUARE_API_KEY:}
+
+googleplaces:
+  api-key: ${GOOGLE_PLACES_API_KEY}
+  language-code: es
+  region-code: ES

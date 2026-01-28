@@ -92,6 +92,39 @@ public class GooglePlacesService {
         }
 
         return switch (category.toLowerCase()) {
+            // NUEVAS CATEGORÍAS según documento
+            case "history" -> new CategoryMapping(
+                    List.of("historical_landmark", "monument", "cultural_landmark", "museum", "archaeological_site"),
+                    "historia OR historical OR patrimonio histórico",
+                    "historical_landmark"
+            );
+            case "food" -> new CategoryMapping(
+                    List.of("restaurant", "cafe", "bakery", "bar", "food"),
+                    null,
+                    null
+            );
+            case "art" -> new CategoryMapping(
+                    List.of("art_gallery", "museum", "cultural_center", "performing_arts_theater", "library"),
+                    "arte OR arquitectura OR art OR architecture",
+                    "art_gallery"
+            );
+            case "sports" -> new CategoryMapping(
+                    List.of("stadium", "gym", "sports_complex", "park", "amusement_park", "tourist_attraction", "aquarium", "zoo"),
+                    "deportes OR ocio OR sports OR recreation",
+                    "park"
+            );
+            case "geography" -> new CategoryMapping(
+                    List.of("natural_feature", "park", "national_park", "hiking_area", "scenic_point"),
+                    "geografía OR paisaje OR viewpoint OR mirador",
+                    "park"
+            );
+            case "industry" -> new CategoryMapping(
+                    List.of("farm", "winery", "brewery", "visitor_center"),
+                    "industria OR agricultura OR bodega OR factory",
+                    "tourist_attraction"
+            );
+
+            // CATEGORÍAS LEGACY para compatibilidad temporal
             case "restaurant" -> new CategoryMapping(
                     List.of("restaurant", "cafe"),
                     null,
@@ -122,6 +155,7 @@ public class GooglePlacesService {
                     "heritage site OR sitio histórico OR patrimonio",
                     "historical_landmark"
             );
+
             default -> new CategoryMapping(
                     List.of("tourist_attraction"),
                     null,

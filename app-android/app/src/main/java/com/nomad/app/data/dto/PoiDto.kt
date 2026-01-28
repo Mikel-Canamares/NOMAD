@@ -38,12 +38,10 @@ private fun PoiDto.buildDescription(): String {
 }
 
 private fun mapCategory(category: String): POICategory {
-    return when (category.lowercase()) {
-        "monument" -> POICategory.MONUMENT
-        "museum" -> POICategory.MUSEUM
-        "viewpoint" -> POICategory.VIEWPOINT
-        "heritage" -> POICategory.HERITAGE
-        "park" -> POICategory.PARK
-        else -> POICategory.OTHER
-    }
+    // Primero intentar mapeo directo con nuevas categorías
+    POICategory.values().find { it.apiKey.equals(category, ignoreCase = true) }
+        ?.let { return it }
+
+    // Fallback: compatibilidad con categorías antiguas del backend
+    return POICategory.fromLegacyCategory(category)
 }

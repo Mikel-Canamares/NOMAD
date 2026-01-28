@@ -3,10 +3,12 @@ package com.nomad.app.ui.voice
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.nomad.app.data.preferences.UserPreferencesRepository
 import com.nomad.app.voice.HybridVoiceManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 
 /**
  * ViewModel para el asistente de voz híbrido
@@ -15,9 +17,27 @@ import kotlinx.coroutines.flow.asStateFlow
 class VoiceViewModel(application: Application) : AndroidViewModel(application) {
 
     private var voiceManager: HybridVoiceManager? = null
+    private val preferencesRepository = UserPreferencesRepository(application)
+    private var currentBackendUrl: String? = null
 
     private val _hasMicPermission = MutableStateFlow(false)
     val hasMicPermission: StateFlow<Boolean> = _hasMicPermission.asStateFlow()
+
+    init {
+        // Observar cambios en preferencias de TTS y backend URL
+        viewModelScope.launch {
+            preferencesRepository.userPreferencesFlow.collect { preferences ->
+                // Actualizar URL del backend
+                currentBackendUrl = preferences.backendUrl
+
+                // Aplicar configuración de TTS cuando cambian las preferencias
+                voiceManager?.let { manager ->
+                    // Acceder al ttsManager a través de un método público
+                    updateTtsSettings(preferences.ttsSpeed, preferences.ttsPitch)
+                }
+            }
+        }
+    }
 
     private val _isPreparing = MutableStateFlow(false)
     val isPreparing: StateFlow<Boolean> = _isPreparing.asStateFlow()
@@ -77,7 +97,7 @@ class VoiceViewModel(application: Application) : AndroidViewModel(application) {
 
         // Crear HybridVoiceManager si no existe
         if (voiceManager == null) {
-            voiceManager = HybridVoiceManager(getApplication()).apply {
+            voiceManager = HybridVoiceManager(getApplication(), currentBackendUrl).apply {
                 // Configurar callbacks de estado
                 onStateChange = { state ->
                     _assistantState.value = when (state) {
@@ -155,7 +175,7 @@ class VoiceViewModel(application: Application) : AndroidViewModel(application) {
             _isPreparing.value = true
             _assistantState.value = AssistantState.INITIALIZING
 
-            voiceManager = HybridVoiceManager(getApplication()).apply {
+            voiceManager = HybridVoiceManager(getApplication(), currentBackendUrl).apply {
                 onStateChange = { state ->
                     _assistantState.value = when (state) {
                         HybridVoiceManager.VoiceState.IDLE -> AssistantState.IDLE
@@ -208,6 +228,14 @@ class VoiceViewModel(application: Application) : AndroidViewModel(application) {
      */
     fun isSpeaking(): Boolean {
         return voiceManager?.isSpeaking() ?: false
+    }
+
+    /**
+     * Actualiza configuración de TTS desde preferencias
+     */
+    private fun updateTtsSettings(speed: Float, pitch: Float) {
+        voiceManager?.updateTtsSpeed(speed)
+        voiceManager?.updateTtsPitch(pitch)
     }
 
     override fun onCleared() {

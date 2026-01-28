@@ -23,7 +23,15 @@ import java.util.Set;
 @Tag(name = "POI", description = "Points of Interest API")
 public class PoiController {
 
+    // Categorías según especificación del documento
     private static final Set<String> VALID_CATEGORIES = Set.of(
+        "history",      // Historia (Amarillo)
+        "food",         // Gastronomía (Morado)
+        "art",          // Arte y arquitectura (Rosa)
+        "sports",       // Deportes y ocio (Naranja)
+        "geography",    // Geografía (Azul)
+        "industry",     // Industria y agricultura (Verde)
+        // Categorías legacy para compatibilidad temporal
         "restaurant", "monument", "museum", "viewpoint", "heritage", "park"
     );
 
@@ -51,7 +59,7 @@ public class PoiController {
             @Parameter(description = "Search radius in meters", required = true)
             @RequestParam @NotNull Double radius,
 
-            @Parameter(description = "Category filter: restaurant | monument | museum | viewpoint | heritage | park")
+            @Parameter(description = "Category filter: history | food | art | sports | geography | industry")
             @RequestParam(required = false) String cat,
 
             @Parameter(description = "Maximum number of results (default: 15, max: 20)")
