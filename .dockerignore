@@ -1,0 +1,39 @@
+# App Android - no necesario para backend
+app-android/
+
+# Documentación
+*.md
+
+# Git
+.git/
+.gitignore
+
+# IDEs
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# Archivos de entorno
+.env
+.env.*
+!.env.example
+
+# Directorios de build locales
+backend/build/
+backend/.gradle/
+
+# Mantener gradle wrapper
+!backend/gradle/
+!backend/gradle/wrapper/
+!backend/gradle/wrapper/gradle-wrapper.jar
+
+# Logs y temporales
+*.log
+*.tmp
+*.swp
+*~
+
+# Archivos de configuración de Railway/Nixpacks innecesarios en imagen
+nixpacks.toml
