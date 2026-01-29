@@ -4,8 +4,9 @@
 # Configuración para forzar uso de Dockerfile en lugar de Railpack
 
 [build]
-builder = "DOCKERFILE"
+builder = "dockerfile"
 dockerfilePath = "Dockerfile"
+watchPatterns = ["backend/**"]
 
 [deploy]
 restartPolicyType = "ON_FAILURE"
