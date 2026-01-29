@@ -6,8 +6,8 @@ spring:
     type: caffeine
     cache-names: poiCache, askCache, placeDetailsCache
     caffeine:
-      # Caché más agresiva en producción para reducir llamadas a APIs externas
-      spec: maximumSize=5000,expireAfterWrite=24h
+      # Caché optimizada para reducir consumo de memoria
+      spec: maximumSize=1000,expireAfterWrite=1h
 
   # Graceful shutdown para Railway
   lifecycle:
@@ -19,8 +19,8 @@ server:
   tomcat:
     connection-timeout: 30s
     threads:
-      max: 50  # Reducido para Railway free tier
-      min-spare: 5
+      max: 20  # Optimizado para Railway: reduce consumo de memoria
+      min-spare: 2
   servlet:
     context-path: /api
   # Configuración de compresión para reducir ancho de banda
@@ -32,9 +32,10 @@ server:
 springdoc:
   api-docs:
     path: /api-docs
+    enabled: false  # Deshabilitado en producción para ahorrar memoria
   swagger-ui:
     path: /swagger-ui.html
-    enabled: true  # Mantener habilitado para testing, deshabilitar si preocupa seguridad
+    enabled: false  # Deshabilitado en producción para ahorrar memoria
 
 management:
   endpoints:

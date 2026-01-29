@@ -48,4 +48,5 @@ USER javauser
 EXPOSE 8080
 
 # ENTRYPOINT en exec form - UNA LÍNEA (sin backslashes)
-ENTRYPOINT ["java", "-Xmx512m", "-Xms256m", "-XX:+UseContainerSupport", "-XX:MaxRAMPercentage=75.0", "-Djava.security.egd=file:/dev/./urandom", "-jar", "app.jar"]
+# Optimizado para Railway: heap reducido + G1GC + String Deduplication
+ENTRYPOINT ["java", "-Xmx256m", "-Xms128m", "-XX:+UseContainerSupport", "-XX:+UseG1GC", "-XX:MaxGCPauseMillis=100", "-XX:+UseStringDeduplication", "-Djava.security.egd=file:/dev/./urandom", "-jar", "app.jar"]
