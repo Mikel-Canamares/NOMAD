@@ -1,0 +1,25 @@
+# Archivos de desarrollo
+.env
+.env.example
+*.md
+.gitignore
+
+# Directorios de build
+build/
+.gradle/
+!gradle/wrapper/gradle-wrapper.jar
+
+# IDEs
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# Logs
+*.log
+
+# Temporales
+*.tmp
+*.swp
+*~

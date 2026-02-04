@@ -10,6 +10,7 @@ spring:
 
 server:
   port: 8081
+  address: 0.0.0.0  # Escuchar en todas las interfaces (permite conexiones desde emulador)
   tomcat:
     connection-timeout: 20s
     threads:

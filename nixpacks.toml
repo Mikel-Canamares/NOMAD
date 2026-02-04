@@ -1,0 +1,3 @@
+# Desactivar Nixpacks para forzar Docker
+[phases.build]
+nixPkgs = []

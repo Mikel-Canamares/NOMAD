@@ -9,9 +9,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlin.time.Duration.Companion.minutes
 
-class PoiRepository {
+class PoiRepository(backendUrl: String? = null) {
 
-    private val apiService = RetrofitClient.apiService
+    private val apiService = RetrofitClient.getInstance(backendUrl).apiService
 
     // Caché en memoria por (geohash5+cat)
     private val cache = mutableMapOf<String, CachedPoisData>()

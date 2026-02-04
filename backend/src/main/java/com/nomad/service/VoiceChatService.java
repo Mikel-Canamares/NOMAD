@@ -64,7 +64,9 @@ public class VoiceChatService {
             requestBody.put("model", "gpt-4-turbo-preview");
             requestBody.set("messages", messages);
             requestBody.put("temperature", 0.7);
-            requestBody.put("max_tokens", 300);  // Respuestas concisas
+            requestBody.put("max_tokens", 200);  // Respuestas MUY concisas para modo conducción
+            requestBody.put("frequency_penalty", 0.3);  // Evitar repeticiones
+            requestBody.put("presence_penalty", 0.3);  // Fomentar variedad
 
             // Llamar a OpenAI Chat API
             JsonNode response = webClient.post()
@@ -100,35 +102,104 @@ public class VoiceChatService {
      */
     private String buildSystemContext(VoiceChatRequest request) {
         StringBuilder context = new StringBuilder();
-        context.append("Eres un asistente de viaje experto. ");
 
-        // Ubicación
+        // Identidad y rol
+        context.append("Eres NOMAD, un asistente turístico especializado en España. ");
+        context.append("Ayudas a viajeros mientras conducen.\n\n");
+
+        // Instrucciones principales
+        context.append("INSTRUCCIONES IMPORTANTES:\n");
+        context.append("1. Responde en español de forma CONVERSACIONAL y NATURAL\n");
+        context.append("2. Sé CONCISO - respuestas cortas (máximo 3-4 frases)\n");
+        context.append("3. El usuario está CONDUCIENDO, evita información que distraiga\n");
+        context.append("4. Enfócate en lo MÁS INTERESANTE e IMPORTANTE\n");
+        context.append("5. Usa un tono AMIGABLE y ENTUSIASTA, como un copiloto\n");
+        context.append("6. Si te preguntan por un POI específico, da DATOS CLAVE (año, arquitecto, curiosidades)\n");
+        context.append("7. Si te preguntan \"qué hay cerca\", menciona los 2-3 lugares MÁS RELEVANTES\n");
+        context.append("8. Para gastronomía, recomienda PLATOS TÍPICOS de la zona\n");
+        context.append("9. NO uses listas numeradas ni formato complejo, habla naturalmente\n");
+        context.append("10. Si no sabes algo, sé honesto pero ofrece información relacionada\n\n");
+
+        // Contexto de ubicación
         if (request.userLat() != null && request.userLng() != null) {
-            context.append(String.format("El usuario está en las coordenadas %.6f, %.6f. ",
+            context.append(String.format("UBICACIÓN ACTUAL: Latitud %.4f, Longitud %.4f\n",
                 request.userLat(), request.userLng()));
+
+            // Aproximar región (simplificado)
+            String location = approximateLocation(request.userLat(), request.userLng());
+            if (location != null) {
+                context.append(String.format("Estás cerca de: %s\n", location));
+            }
         }
 
-        // Categoría activa
+        // Contexto de categoría seleccionada
         if (request.selectedCategory() != null && !request.selectedCategory().isBlank()) {
-            context.append(String.format("Está viendo la categoría: %s. ", request.selectedCategory()));
+            String categoryContext = switch (request.selectedCategory().toLowerCase()) {
+                case "history" -> "El usuario está interesado en HISTORIA. Enfócate en eventos históricos, personajes, batallas, etc.";
+                case "food" -> "El usuario está interesado en GASTRONOMÍA. Recomienda platos típicos, restaurantes, productos locales.";
+                case "art" -> "El usuario está interesado en ARTE Y ARQUITECTURA. Habla de estilos, artistas, obras importantes.";
+                case "sports" -> "El usuario está interesado en DEPORTES Y OCIO. Sugiere actividades, parques, eventos deportivos.";
+                case "geography" -> "El usuario está interesado en GEOGRAFÍA. Describe paisajes, formaciones naturales, ecosistemas.";
+                case "industry" -> "El usuario está interesado en INDUSTRIA Y AGRICULTURA. Menciona productos locales, tradiciones artesanales.";
+                default -> "";
+            };
+
+            if (!categoryContext.isEmpty()) {
+                context.append(categoryContext).append("\n");
+            }
         }
 
         // POIs cercanos
         if (request.nearbyPois() != null && !request.nearbyPois().isEmpty()) {
-            String poisList = request.nearbyPois().stream()
-                .limit(10)
-                .map(poi -> (String) poi.get("name"))
-                .collect(Collectors.joining(", "));
+            context.append("\nPUNTOS DE INTERÉS CERCANOS:\n");
 
-            context.append(String.format("Hay %d POIs cercanos: %s. ",
-                request.nearbyPois().size(), poisList));
+            int count = 0;
+            for (Map<String, Object> poi : request.nearbyPois()) {
+                if (count >= 10) break; // Máximo 10 POIs
+
+                String name = (String) poi.get("name");
+                String category = (String) poi.get("category");
+                Object distanceObj = poi.get("distance");
+                Double distance = distanceObj instanceof Number
+                    ? ((Number) distanceObj).doubleValue()
+                    : null;
+
+                context.append(String.format("- %s (%s)%s\n",
+                    name,
+                    category,
+                    distance != null ? String.format(" - %.0f metros", distance) : ""
+                ));
+
+                count++;
+            }
         }
 
-        context.append("Responde de forma concisa y natural (máximo 2-3 frases). ");
-        context.append("Si necesitas información específica de un POI, usa los datos proporcionados. ");
-        context.append("Responde en español con tono amigable.");
+        context.append("\nRECUERDA: Responde como si hablaras con un amigo en el coche. ");
+        context.append("Breve, interesante y sin tecnicismos innecesarios.");
 
         return context.toString();
+    }
+
+    /**
+     * Aproxima la ubicación a ciudades principales de España
+     */
+    private String approximateLocation(double lat, double lng) {
+        if (lat >= 40.3 && lat <= 40.5 && lng >= -3.8 && lng <= -3.6) {
+            return "Madrid";
+        } else if (lat >= 39.4 && lat <= 39.5 && lng >= -0.4 && lng <= -0.3) {
+            return "Valencia";
+        } else if (lat >= 41.3 && lat <= 41.5 && lng >= 2.0 && lng <= 2.2) {
+            return "Barcelona";
+        } else if (lat >= 37.3 && lat <= 37.5 && lng >= -6.0 && lng <= -5.9) {
+            return "Sevilla";
+        } else if (lat >= 39.8 && lat <= 40.0 && lng >= -4.1 && lng <= -4.0) {
+            return "Toledo";
+        } else if (lat >= 43.2 && lat <= 43.4 && lng >= -3.0 && lng <= -2.8) {
+            return "Bilbao";
+        } else if (lat >= 36.7 && lat <= 36.8 && lng >= -4.5 && lng <= -4.3) {
+            return "Málaga";
+        }
+        return null;
     }
 
     /**

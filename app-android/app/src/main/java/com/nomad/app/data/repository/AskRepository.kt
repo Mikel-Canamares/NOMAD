@@ -8,9 +8,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
-class AskRepository {
+class AskRepository(backendUrl: String? = null) {
 
-    private val apiService = RetrofitClient.apiService
+    private val apiService = RetrofitClient.getInstance(backendUrl).apiService
 
     /**
      * Envía una pregunta al backend con retry y backoff

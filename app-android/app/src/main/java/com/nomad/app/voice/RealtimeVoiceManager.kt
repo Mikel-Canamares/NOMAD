@@ -83,7 +83,7 @@ class RealtimeVoiceManager(private val context: Context) {
             try {
                 // Paso 1: Obtener token efímero del backend
                 val sessionResponse = withContext(Dispatchers.IO) {
-                    RetrofitClient.apiService.createRealtimeSession()
+                    RetrofitClient.getInstance().apiService.createRealtimeSession()
                 }
                 ephemeralToken = sessionResponse.client_secret
                 Log.d(TAG, "Token efímero obtenido: ${ephemeralToken?.take(20)}...")

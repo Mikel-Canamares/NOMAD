@@ -24,12 +24,17 @@ android {
     }
 
     buildTypes {
+        debug {
+            // 10.0.2.2 es la IP especial del emulador que apunta a localhost de la PC
+            buildConfigField("String", "DEFAULT_BACKEND_URL", "\"http://10.0.2.2:8081/api/\"")
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            buildConfigField("String", "DEFAULT_BACKEND_URL", "\"https://nomad-backend.railway.app/api/\"")
         }
     }
 
@@ -106,6 +111,9 @@ dependencies {
 
     // WebRTC - Threema builds on Maven Central
     implementation("ch.threema:webrtc-android:134.0.0")
+
+    // DataStore para preferencias de usuario
+    implementation("androidx.datastore:datastore-preferences:1.1.1")
 
     // Testing
     testImplementation("junit:junit:4.13.2")

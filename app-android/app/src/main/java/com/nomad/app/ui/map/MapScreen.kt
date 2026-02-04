@@ -5,16 +5,22 @@ import android.util.Log
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.*
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -41,6 +47,7 @@ import com.google.maps.android.compose.rememberCameraPositionState
 import androidx.compose.runtime.collectAsState
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.nomad.app.data.dto.AskResponse
+import com.nomad.app.data.preferences.UserPreferencesRepository
 import com.nomad.app.data.repository.AskRepository
 import com.nomad.app.data.repository.PoiRepository
 import com.nomad.app.location.LocationManager
@@ -51,9 +58,11 @@ import com.nomad.app.permission.rememberAudioPermissionState
 import com.nomad.app.ui.voice.VoiceViewModel
 import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MapScreen(
     locationManager: LocationManager,
+    onNavigateToSettings: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     // ViewModel para asistente de voz integrado
@@ -63,22 +72,57 @@ fun MapScreen(
     val assistantState by voiceViewModel.assistantState.collectAsState()
     val audioPermissionState = rememberAudioPermissionState()
 
+    // Preferencias de usuario
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val preferencesRepository = remember { UserPreferencesRepository(context) }
+    val userPreferences by preferencesRepository.userPreferencesFlow.collectAsState(initial = com.nomad.app.data.preferences.UserPreferences())
+
     var currentLocation by remember { mutableStateOf<Location?>(null) }
     var showBottomSheet by remember { mutableStateOf(false) }
     var pois by remember { mutableStateOf<List<POI>>(emptyList()) }
     var selectedPoi by remember { mutableStateOf<POI?>(null) }
     var selectedPoiId by remember { mutableStateOf<String?>(null) }
-    var selectedCategory by remember { mutableStateOf<POICategory?>(POICategory.MONUMENT) }
+    var selectedCategory by remember { mutableStateOf<POICategory?>(null) }
     var isLoadingPois by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var showInfoBottomSheet by remember { mutableStateOf(false) }
     var showMarkerDetailSheet by remember { mutableStateOf(false) }
     var askResponse by remember { mutableStateOf<AskResponse?>(null) }
     var isLoadingAsk by remember { mutableStateOf(false) }
-    val poiRepository = remember { PoiRepository() }
-    val askRepository = remember { AskRepository() }
+
+    // Repositorios con URL dinámica desde preferencias
+    val poiRepository = remember(userPreferences.backendUrl) {
+        PoiRepository(userPreferences.backendUrl)
+    }
+    val askRepository = remember(userPreferences.backendUrl) {
+        AskRepository(userPreferences.backendUrl)
+    }
+
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
+
+    // Control de actualización de POIs: solo actualizar si la ubicación cambió al menos 200m
+    var lastPoiLoadLocation by remember { mutableStateOf<LatLng?>(null) }
+    var lastSelectedCategory by remember { mutableStateOf<POICategory?>(null) }
+    val minDistanceForUpdateMeters = 200.0
+
+    fun shouldUpdatePois(newLocation: Location): Boolean {
+        val lastLocation = lastPoiLoadLocation ?: return true
+        val newLatLng = LatLng(newLocation.latitude, newLocation.longitude)
+
+        // Calcular distancia aproximada en metros (fórmula de Haversine simplificada)
+        val latDiff = Math.abs(newLatLng.latitude - lastLocation.latitude)
+        val lngDiff = Math.abs(newLatLng.longitude - lastLocation.longitude)
+        val avgLat = (newLatLng.latitude + lastLocation.latitude) / 2
+
+        // 1 grado de latitud ≈ 111km, 1 grado de longitud ≈ 111km * cos(lat)
+        val distanceMeters = Math.sqrt(
+            Math.pow(latDiff * 111000, 2.0) +
+            Math.pow(lngDiff * 111000 * Math.cos(Math.toRadians(avgLat)), 2.0)
+        )
+
+        return distanceMeters >= minDistanceForUpdateMeters
+    }
 
     // Obtener ubicación actual
     LaunchedEffect(Unit) {
@@ -100,7 +144,7 @@ fun MapScreen(
             val poisData = pois.map { poi ->
                 mapOf<String, Any>(
                     "name" to poi.name,
-                    "category" to (poi.category ?: "unknown"),
+                    "category" to poi.category.displayName,
                     "lat" to poi.location.latitude,
                     "lng" to poi.location.longitude
                 )
@@ -118,31 +162,70 @@ fun MapScreen(
         }
     }
 
-    // Cargar POIs cercanos cuando cambia ubicación o categoría
-    LaunchedEffect(currentLocation, selectedCategory) {
-        currentLocation?.let { location ->
-            Log.d("MapScreen", "Cargando POIs para ubicación: ${location.latitude}, ${location.longitude}, categoría: ${selectedCategory?.apiValue}")
-            isLoadingPois = true
-            errorMessage = null
-
-            val result = poiRepository.getNearbyPois(
-                latitude = location.latitude,
-                longitude = location.longitude,
-                radiusMeters = 1200,
-                category = selectedCategory?.apiValue,
-                limit = 15
-            )
-
-            result.onSuccess { loadedPois ->
-                Log.d("MapScreen", "POIs cargados exitosamente: ${loadedPois.size} POIs")
-                pois = loadedPois
-            }.onFailure { error ->
-                Log.e("MapScreen", "Error cargando POIs: ${error.message}", error)
-                errorMessage = "Fuente temporalmente saturada. Inténtalo de nuevo."
-                snackbarHostState.showSnackbar(errorMessage!!)
+    // Actualizar contexto del asistente cuando cambien los POIs o la categoría (solo si está activo)
+    LaunchedEffect(pois, selectedCategory, isVoiceActive) {
+        if (isVoiceActive && currentLocation != null) {
+            // Preparar lista de POIs como mapas
+            val poisData = pois.map { poi ->
+                mapOf<String, Any>(
+                    "name" to poi.name,
+                    "category" to poi.category.displayName,
+                    "lat" to poi.location.latitude,
+                    "lng" to poi.location.longitude
+                )
             }
 
-            isLoadingPois = false
+            // Actualizar contexto
+            voiceViewModel.updateContext(
+                userLat = currentLocation!!.latitude,
+                userLng = currentLocation!!.longitude,
+                selectedCategory = selectedCategory?.displayName,
+                pois = poisData
+            )
+
+            Log.d("MapScreen", "Contexto del asistente actualizado - POIs: ${pois.size}, Categoría: ${selectedCategory?.displayName}")
+        }
+    }
+
+    // Cargar POIs cercanos cuando cambia ubicación o categoría
+    // Lógica:
+    // 1. Primera carga: Cargar todos los POIs (sin filtro) cuando se obtiene la ubicación
+    // 2. Cambio de categoría: Recargar cuando cambia selectedCategory
+    // 3. Cambio de ubicación: Recargar solo si cambió más de 200m (y no cambió categoría)
+    LaunchedEffect(currentLocation, selectedCategory) {
+        currentLocation?.let { location ->
+            // Verificar si debemos actualizar POIs
+            val categoryChanged = selectedCategory != lastSelectedCategory
+            val locationChanged = shouldUpdatePois(location)
+
+            if (locationChanged || categoryChanged) {
+                Log.d("MapScreen", "Cargando POIs para ubicación: ${location.latitude}, ${location.longitude}, categoría: ${selectedCategory?.apiValue} (distancia: $locationChanged, categoría: $categoryChanged)")
+                isLoadingPois = true
+                errorMessage = null
+
+                val result = poiRepository.getNearbyPois(
+                    latitude = location.latitude,
+                    longitude = location.longitude,
+                    radiusMeters = userPreferences.poiRadiusMeters,
+                    category = selectedCategory?.apiValue,
+                    limit = 40
+                )
+
+                result.onSuccess { loadedPois ->
+                    Log.d("MapScreen", "POIs cargados exitosamente: ${loadedPois.size} POIs")
+                    pois = loadedPois
+                    lastPoiLoadLocation = LatLng(location.latitude, location.longitude)
+                    lastSelectedCategory = selectedCategory
+                }.onFailure { error ->
+                    Log.e("MapScreen", "Error cargando POIs: ${error.message}", error)
+                    errorMessage = "Fuente temporalmente saturada. Inténtalo de nuevo."
+                    snackbarHostState.showSnackbar(errorMessage!!)
+                }
+
+                isLoadingPois = false
+            } else {
+                Log.d("MapScreen", "Ubicación demasiado cerca de la anterior, usando POIs cacheados")
+            }
         }
     }
 
@@ -163,10 +246,34 @@ fun MapScreen(
         }
     }
 
-    Box(modifier = modifier.fillMaxSize()) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            // Chips de filtro de categorías
-            LazyRow(
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        text = "NOMAD",
+                        style = MaterialTheme.typography.headlineSmall
+                    )
+                },
+                actions = {
+                    IconButton(
+                        onClick = onNavigateToSettings,
+                        modifier = Modifier.size(56.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = "Ajustes",
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+                }
+            )
+        }
+    ) { paddingValues ->
+        Box(modifier = modifier.fillMaxSize().padding(paddingValues)) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                // Chips de filtro de categorías con colores e iconos
+                LazyRow(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp)
@@ -177,13 +284,42 @@ fun MapScreen(
                         onClick = {
                             selectedCategory = if (selectedCategory == category) null else category
                         },
-                        label = { Text(category.displayName) },
-                        modifier = Modifier.padding(end = 8.dp)
+                        label = {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = category.icon,
+                                    contentDescription = null,
+                                    modifier = Modifier
+                                        .padding(end = 6.dp)
+                                        .size(20.dp)
+                                )
+                                Text(
+                                    text = category.displayName,
+                                    style = MaterialTheme.typography.labelLarge
+                                )
+                            }
+                        },
+                        modifier = Modifier
+                            .padding(end = 8.dp)
+                            .defaultMinSize(minHeight = 48.dp), // Mínimo 48dp para touch target
+                        leadingIcon = {
+                            if (selectedCategory == category) {
+                                Icon(
+                                    imageVector = category.icon,
+                                    contentDescription = null,
+                                    tint = category.color,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
                     )
                 }
             }
 
-            // Mapa de Google
+            // Mapa de Google - Optimizado para modo conductor
             GoogleMap(
                 modifier = Modifier
                     .fillMaxSize()
@@ -194,7 +330,13 @@ fun MapScreen(
                 ),
                 uiSettings = MapUiSettings(
                     zoomControlsEnabled = false,
-                    myLocationButtonEnabled = true
+                    myLocationButtonEnabled = true,
+                    compassEnabled = true,
+                    mapToolbarEnabled = false, // Desactivar toolbar de Google Maps para simplificar UI
+                    rotationGesturesEnabled = true,
+                    scrollGesturesEnabled = true,
+                    tiltGesturesEnabled = false, // Desactivar inclinación para simplificar navegación
+                    zoomGesturesEnabled = true
                 )
             ) {
                 // Mostrar solo los primeros 40 marcadores si hay muchos POIs
@@ -205,13 +347,27 @@ fun MapScreen(
                     pois
                 }
 
-                // Marcadores
+                // Marcadores con colores según categoría
                 poisToShow.forEach { poi ->
+                    // Determinar color del marcador según categoría
+                    val markerColor = when (poi.category) {
+                        POICategory.HISTORIA -> com.google.android.gms.maps.model.BitmapDescriptorFactory.HUE_YELLOW
+                        POICategory.GASTRONOMIA -> com.google.android.gms.maps.model.BitmapDescriptorFactory.HUE_VIOLET
+                        POICategory.ARTE -> com.google.android.gms.maps.model.BitmapDescriptorFactory.HUE_ROSE
+                        POICategory.DEPORTES -> com.google.android.gms.maps.model.BitmapDescriptorFactory.HUE_ORANGE
+                        POICategory.GEOGRAFIA -> com.google.android.gms.maps.model.BitmapDescriptorFactory.HUE_AZURE
+                        POICategory.INDUSTRIA -> com.google.android.gms.maps.model.BitmapDescriptorFactory.HUE_GREEN
+                    }
+
                     Marker(
                         state = MarkerState(position = poi.location),
                         title = poi.name,
                         snippet = poi.description,
+                        icon = com.google.android.gms.maps.model.BitmapDescriptorFactory.defaultMarker(markerColor),
                         onClick = {
+                            // NUEVO: Detener TTS si está hablando
+                            voiceViewModel.stopSpeaking()
+
                             selectedPoi = poi
                             selectedPoiId = poi.id
                             showMarkerDetailSheet = true
@@ -246,7 +402,7 @@ fun MapScreen(
             }
         }
 
-        // Mensaje de estado del asistente
+        // Mensaje de estado del asistente - Alto contraste para visibilidad
         if (isVoiceActive || isPreparing) {
             val statusText = when {
                 isPreparing -> "Inicializando..."
@@ -261,13 +417,15 @@ fun MapScreen(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(bottom = 104.dp),
-                color = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant,
-                shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp)
+                color = MaterialTheme.colorScheme.primaryContainer,
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
+                tonalElevation = 6.dp
             ) {
                 Text(
                     text = statusText,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                    style = androidx.compose.material3.MaterialTheme.typography.bodyMedium
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
                 )
             }
         }
@@ -292,16 +450,20 @@ fun MapScreen(
                 .padding(bottom = 32.dp)
         )
 
-        // FAB para mostrar lista de POIs
+        // FAB para mostrar lista de POIs - Tamaño grande para modo conductor
         FloatingActionButton(
             onClick = { showBottomSheet = true },
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(16.dp)
+                .size(56.dp), // Tamaño grande para accesibilidad
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
         ) {
             Icon(
                 imageVector = Icons.Default.List,
-                contentDescription = "Mostrar POIs"
+                contentDescription = "Mostrar POIs",
+                modifier = Modifier.size(28.dp) // Icono grande
             )
         }
 
@@ -384,8 +546,13 @@ fun MapScreen(
                     showMarkerDetailSheet = false
                     askResponse = null
                     selectedPoi = null
+                },
+                onAskAssistant = { query ->
+                    // Usar el asistente de voz para hablar sobre este POI
+                    voiceViewModel.speakAbout(query)
                 }
             )
+        }
         }
     }
 }
