@@ -25,6 +25,7 @@ android {
 
     buildTypes {
         debug {
+            // 10.0.2.2 es la IP especial del emulador que apunta a localhost de la PC
             buildConfigField("String", "DEFAULT_BACKEND_URL", "\"http://10.0.2.2:8081/api/\"")
         }
         release {

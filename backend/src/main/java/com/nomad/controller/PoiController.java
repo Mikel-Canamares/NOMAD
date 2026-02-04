@@ -62,9 +62,9 @@ public class PoiController {
             @Parameter(description = "Category filter: history | food | art | sports | geography | industry")
             @RequestParam(required = false) String cat,
 
-            @Parameter(description = "Maximum number of results (default: 15, max: 20)")
+            @Parameter(description = "Maximum number of results (default: 15, max: 50)")
             @RequestParam(required = false, defaultValue = "15")
-            @Min(1) @Max(20) Integer limit,
+            @Min(1) @Max(50) Integer limit,
 
             @Parameter(description = "Locale (e.g., 'es' or 'es-ES'). Defaults to 'es'")
             @RequestParam(required = false) String locale,

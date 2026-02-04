@@ -1,0 +1,63 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Android: Install Debug & Show Logs",
+      "type": "shell",
+      "command": "./gradlew installDebug; adb shell am start -n com.nomad.app/.MainActivity; Start-Sleep -Seconds 2; adb logcat",
+      "options": {
+        "cwd": "${workspaceFolder}/app-android"
+      },
+      "problemMatcher": [],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
+      "label": "Android: Install Debug & Show Filtered Logs",
+      "type": "shell",
+      "command": "./gradlew installDebug; adb shell am start -n com.nomad.app/.MainActivity; Start-Sleep -Seconds 2; adb logcat | Select-String 'nomad|Retrofit|OkHttp|AndroidRuntime|FATAL|ERROR'",
+      "options": {
+        "cwd": "${workspaceFolder}/app-android"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
+      "label": "Android: Show Logs Only",
+      "type": "shell",
+      "command": "adb logcat | Select-String 'nomad|Retrofit|OkHttp|AndroidRuntime|FATAL|ERROR'",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": false
+      }
+    },
+    {
+      "label": "Android: Clear Logs",
+      "type": "shell",
+      "command": "adb logcat -c",
+      "problemMatcher": []
+    },
+    {
+      "label": "Android: Install Release",
+      "type": "shell",
+      "command": "./gradlew assembleRelease; adb install -r app/build/outputs/apk/release/app-release.apk",
+      "options": {
+        "cwd": "${workspaceFolder}/app-android"
+      },
+      "problemMatcher": []
+    }
+  ]
+}

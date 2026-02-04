@@ -58,6 +58,7 @@ import com.nomad.app.permission.rememberAudioPermissionState
 import com.nomad.app.ui.voice.VoiceViewModel
 import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MapScreen(
     locationManager: LocationManager,
@@ -81,7 +82,7 @@ fun MapScreen(
     var pois by remember { mutableStateOf<List<POI>>(emptyList()) }
     var selectedPoi by remember { mutableStateOf<POI?>(null) }
     var selectedPoiId by remember { mutableStateOf<String?>(null) }
-    var selectedCategory by remember { mutableStateOf<POICategory?>(POICategory.MONUMENT) }
+    var selectedCategory by remember { mutableStateOf<POICategory?>(null) }
     var isLoadingPois by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var showInfoBottomSheet by remember { mutableStateOf(false) }
@@ -102,6 +103,7 @@ fun MapScreen(
 
     // Control de actualización de POIs: solo actualizar si la ubicación cambió al menos 200m
     var lastPoiLoadLocation by remember { mutableStateOf<LatLng?>(null) }
+    var lastSelectedCategory by remember { mutableStateOf<POICategory?>(null) }
     val minDistanceForUpdateMeters = 200.0
 
     fun shouldUpdatePois(newLocation: Location): Boolean {
@@ -142,7 +144,7 @@ fun MapScreen(
             val poisData = pois.map { poi ->
                 mapOf<String, Any>(
                     "name" to poi.name,
-                    "category" to (poi.category ?: "unknown"),
+                    "category" to poi.category.displayName,
                     "lat" to poi.location.latitude,
                     "lng" to poi.location.longitude
                 )
@@ -160,12 +162,40 @@ fun MapScreen(
         }
     }
 
+    // Actualizar contexto del asistente cuando cambien los POIs o la categoría (solo si está activo)
+    LaunchedEffect(pois, selectedCategory, isVoiceActive) {
+        if (isVoiceActive && currentLocation != null) {
+            // Preparar lista de POIs como mapas
+            val poisData = pois.map { poi ->
+                mapOf<String, Any>(
+                    "name" to poi.name,
+                    "category" to poi.category.displayName,
+                    "lat" to poi.location.latitude,
+                    "lng" to poi.location.longitude
+                )
+            }
+
+            // Actualizar contexto
+            voiceViewModel.updateContext(
+                userLat = currentLocation!!.latitude,
+                userLng = currentLocation!!.longitude,
+                selectedCategory = selectedCategory?.displayName,
+                pois = poisData
+            )
+
+            Log.d("MapScreen", "Contexto del asistente actualizado - POIs: ${pois.size}, Categoría: ${selectedCategory?.displayName}")
+        }
+    }
+
     // Cargar POIs cercanos cuando cambia ubicación o categoría
-    // Solo actualiza si la ubicación cambió al menos 200m O si cambió la categoría
+    // Lógica:
+    // 1. Primera carga: Cargar todos los POIs (sin filtro) cuando se obtiene la ubicación
+    // 2. Cambio de categoría: Recargar cuando cambia selectedCategory
+    // 3. Cambio de ubicación: Recargar solo si cambió más de 200m (y no cambió categoría)
     LaunchedEffect(currentLocation, selectedCategory) {
         currentLocation?.let { location ->
             // Verificar si debemos actualizar POIs
-            val categoryChanged = selectedCategory != null // Si hay categoría seleccionada, siempre actualizar
+            val categoryChanged = selectedCategory != lastSelectedCategory
             val locationChanged = shouldUpdatePois(location)
 
             if (locationChanged || categoryChanged) {
@@ -185,6 +215,7 @@ fun MapScreen(
                     Log.d("MapScreen", "POIs cargados exitosamente: ${loadedPois.size} POIs")
                     pois = loadedPois
                     lastPoiLoadLocation = LatLng(location.latitude, location.longitude)
+                    lastSelectedCategory = selectedCategory
                 }.onFailure { error ->
                     Log.e("MapScreen", "Error cargando POIs: ${error.message}", error)
                     errorMessage = "Fuente temporalmente saturada. Inténtalo de nuevo."
@@ -227,20 +258,15 @@ fun MapScreen(
                 actions = {
                     IconButton(
                         onClick = onNavigateToSettings,
-                        modifier = Modifier.size(56.dp) // Touch target grande
+                        modifier = Modifier.size(56.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Settings,
                             contentDescription = "Ajustes",
-                            modifier = Modifier.size(28.dp),
-                            tint = MaterialTheme.colorScheme.onSurface
+                            modifier = Modifier.size(28.dp)
                         )
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    titleContentColor = MaterialTheme.colorScheme.onSurface
-                )
+                }
             )
         }
     ) { paddingValues ->

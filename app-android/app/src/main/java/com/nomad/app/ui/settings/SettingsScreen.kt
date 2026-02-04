@@ -4,7 +4,11 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Place
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -31,7 +35,7 @@ fun SettingsScreen(
                 },
                 actions = {
                     IconButton(onClick = { showResetDialog = true }) {
-                        Icon(Icons.Default.RestartAlt, "Restablecer")
+                        Icon(Icons.Default.Refresh, "Restablecer")
                     }
                 }
             )
@@ -48,7 +52,7 @@ fun SettingsScreen(
             // Sección: Mapa y POIs
             SettingsSection(
                 title = "Mapa y Puntos de Interés",
-                icon = Icons.Default.Map
+                icon = Icons.Default.Place
             ) {
                 RadiusSelector(
                     currentRadius = preferences.poiRadiusMeters,
@@ -59,7 +63,7 @@ fun SettingsScreen(
             // Sección: Asistente de Voz
             SettingsSection(
                 title = "Asistente de Voz",
-                icon = Icons.Default.RecordVoiceOver
+                icon = Icons.Default.Person
             ) {
                 FrequencySelector(
                     currentFrequency = preferences.proactiveAlertFrequencyMinutes,
@@ -84,7 +88,7 @@ fun SettingsScreen(
             // Sección: Avanzado (solo para desarrollo)
             SettingsSection(
                 title = "Avanzado",
-                icon = Icons.Default.DeveloperMode
+                icon = Icons.Default.Settings
             ) {
                 BackendUrlInput(
                     currentUrl = preferences.backendUrl,

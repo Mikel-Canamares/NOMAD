@@ -1,7 +1,9 @@
 package com.nomad.app.model
 
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.Place
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.google.android.gms.maps.model.LatLng
@@ -36,38 +38,40 @@ enum class POICategory(
         displayName = "Historia",
         color = Color(0xFFFFEB3B), // Amarillo
         apiKey = "history",
-        icon = Icons.Default.AccountBalance // Edificio histórico
+        icon = Icons.Default.Place
     ),
     GASTRONOMIA(
         displayName = "Gastronomía",
         color = Color(0xFF9C27B0), // Morado
         apiKey = "food",
-        icon = Icons.Default.Restaurant
+        icon = Icons.Default.Star
     ),
     ARTE(
         displayName = "Arte y arquitectura",
         color = Color(0xFFE91E63), // Rosa
         apiKey = "art",
-        icon = Icons.Default.Palette
+        icon = Icons.Default.Star
     ),
     DEPORTES(
         displayName = "Deportes y ocio",
         color = Color(0xFFFF9800), // Naranja
         apiKey = "sports",
-        icon = Icons.Default.SportsBasketball
+        icon = Icons.Default.Star
     ),
     GEOGRAFIA(
         displayName = "Geografía",
         color = Color(0xFF2196F3), // Azul
         apiKey = "geography",
-        icon = Icons.Default.Terrain // Montañas/paisaje
+        icon = Icons.Default.LocationOn
     ),
     INDUSTRIA(
         displayName = "Industria y agricultura",
         color = Color(0xFF4CAF50), // Verde
         apiKey = "industry",
-        icon = Icons.Default.Business // Fábrica/industria
+        icon = Icons.Default.LocationOn
     );
+
+    val apiValue: String get() = apiKey
 
     companion object {
         /**
